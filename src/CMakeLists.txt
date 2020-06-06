@@ -9,5 +9,5 @@ if (ENABLE_READLINE)
     add_definitions (-DENABLE_READLINE)
 endif()
 
-add_executable(mptypes mptypes.cpp algorithms.h fourier.h WavFile.h Oscillator.h)
+add_executable(mptypes mptypes.cpp algorithms.h fourier.h WavFile.h Oscillator.h Matrix.h)
 target_link_libraries (mptypes dl ${LIBS})

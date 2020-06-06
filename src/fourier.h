@@ -23,7 +23,7 @@ struct Peak {
 };
 
 template <typename T>
-void makeWindow (T* out, int N, T a0, T a1, T a2) {
+void make_window (T* out, int N, T a0, T a1, T a2) {
     // .5, .5, 0     --> hanning
     // .54, .46, 0   --> hamming
     // .42, .5, 0.08 --> blackman
@@ -31,6 +31,15 @@ void makeWindow (T* out, int N, T a0, T a1, T a2) {
         out[i] = a0 - a1 * cos ((TWOPI * (T) i) / (N - 1)) + a2 *
                  cos ((2 * TWOPI * (T) i) / (N - 1)); // hamming, hann or blackman
     }
+}
+
+template <typename T>
+void gauss_window (T* win, int N, T alpha) {
+	int N2 = (N  / 2);
+	for (int n = -N2; n < N2; ++n) {
+		T r = alpha * (T) n / (T)(N / 2.);
+		win[n + N2] = exp (-0.5 * r * r);
+	}
 }
 
 template <typename T>
@@ -79,25 +88,7 @@ void fft(T* data, const int n, const int isign) {
 }
 
 template <typename T>
-T cubicInterp (T x1, T x2, T x3, T y1, T y2, T y3, T *min) {
-    T a, b, c;
-    T pos;
-    a= ((y1-y2)/(x1-x2)-(y2-y3)/(x2-x3))/(x1-x3);
-    b= (y1-y2)/(x1-x2) - a*(x1+x2);
-    c= y1-a*x1*x1-b*x1;
-
-    *min= c;
-
-    // dy/dx = 2a*x + b = 0
-
-    pos= -b/2.0/a;
-
-    return pos;
-
-}
-
-template <typename T>
-void ampFreq (const T* cbuffer, T* amp, T* freq, int N,  double R) {
+void amp_freq (const T* cbuffer, T* amp, T* freq, int N,  double R) {
     T freqPerBin = (R ) / (T) N;
 	T min = 0;
     for (int i = 0; i < N; ++i) {
@@ -112,7 +103,7 @@ void ampFreq (const T* cbuffer, T* amp, T* freq, int N,  double R) {
 }
 
 template <typename T>
-T locmaxAmpFreq (const T* amp, const T* freq, int size, std::vector<int>& max, T FUNDAMENTAL) {
+T locmax_amp_freq (const T* amp, const T* freq, int size, std::vector<int>& max, T FUNDAMENTAL) {
 	T maxPeak = amp[2];
 	for (int i = 2; i < size - 2; ++i) {
 		T magCurr = amp[i]; //20 * log10 (amp[i] + .00000001);

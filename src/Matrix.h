@@ -292,6 +292,9 @@ template <typename T>
 	return s;
 }
 
+template <typename T>
+using DynamicMatrix = std::vector<std::vector <T> >;
+
 #endif	// MATRIX_H 
 
 // EOF
