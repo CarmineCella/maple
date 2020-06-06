@@ -11,15 +11,18 @@ using namespace std;
 
 int main (int argc, char* argv[]) {
 	try {
-		double SR = 44100;
-		double J = (13);
+		float SR = 44100;
+		float J = (12);
 		int N = pow (2., J);
-		int NCOMP = 30;
-		double fdef = 2;
-		DynamicMatrix<double> dictionary;
+		int NCOMP = 512;
+		float fdef = 12;
+		float flimit = 11050;
+
+		DynamicMatrix<float> dictionary;
 
 		cout << "make dictionary..."; cout.flush();
-		make_dictionary (dictionary, J, fdef, SR);
+		make_gabor_dictionary<float>(dictionary, J, fdef, flimit, SR);
+		// make_fourier_dictionary<float>(dictionary, J, flimit, SR);
 		std::cout << "done (" << dictionary.size () << " atoms)" << std::endl;
 		cout << "save dictionary..."; cout.flush();
 		WavOutFile dict ("dictionary.wav", SR, 16, 1);
@@ -28,21 +31,32 @@ int main (int argc, char* argv[]) {
 		}
 		std::cout << "done" << endl;
 
-		WavInFile in ("Vox.wav");
-
+		WavInFile in ("Jarrett_Vienna_cut.wav");
 		WavOutFile out ("reconstruction.wav", SR, 16, 1);
 
-		std::cout << "analysing "; cout.flush ();
-		vector<double> buffer (N);
-		while (!in.eof ()) {
-			int r = in.read (&buffer[0], N);
-			vector<double> decomposition;
-			pursuit_decomposition(dictionary, NCOMP, buffer, SR, decomposition);
+		std::cout << "analysing ["; cout.flush ();
+		vector<float> buffer (N);
+		vector<float> hann (N);
+		make_window<float>(&hann[0], N, .5, .5, 0.);
+		vector<float> target (in.getNumSamples());
+		vector<float> rebuild (in.getNumSamples());
+		memset (&rebuild[0], 0, sizeof (float) * in.getNumSamples());
+
+		int r = in.read (&target[0], in.getNumSamples());
+		int p = 0;
+		int hop = N;
+		vector<float> decomposition (dictionary.size ());
+		while (p < r) {
+			for (int i  = 0; i < N; ++i) buffer[i] = target[i + p];
+			memset(&decomposition[0], 0, sizeof (float) * decomposition.size ());
+			pursuit_decomposition<float>(dictionary, NCOMP, buffer, SR, decomposition);
 			reconstruct_from_projections (dictionary, decomposition, buffer);
-			out.write (&buffer[0], r);
+			for (int i  = 0; i < N; ++i) rebuild[i + p] += buffer[i];// * hann[i];
 			cout << "*"; cout.flush ();
+			p += hop;
 		}
-		cout << endl;
+		cout << "]" << endl;
+		out.write (&rebuild[0], r);
 	}
 	catch (exception& e) {
 		cout << "Error: " << e.what () << endl;
