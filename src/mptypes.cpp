@@ -14,9 +14,9 @@ int main (int argc, char* argv[]) {
 		float SR = 44100;
 		float J = (12);
 		int N = pow (2., J);
-		int NCOMP = 512;
-		float fdef = 12;
-		float flimit = 11050;
+		int NCOMP = 100;
+		float fdef = 6;
+		float flimit = 19000;
 
 		DynamicMatrix<float> dictionary;
 
@@ -29,9 +29,9 @@ int main (int argc, char* argv[]) {
 		for (unsigned i = 0; i < dictionary.size (); ++i) {
 			dict.write (&dictionary[i][0], dictionary[i].size ());
 		}
-		std::cout << "done" << endl;
+		std::cout << "done" << endl << endl;
 
-		WavInFile in ("Jarrett_Vienna_cut.wav");
+		WavInFile in ("../../samples/Jarrett_Vienna_cut.wav");
 		WavOutFile out ("reconstruction.wav", SR, 16, 1);
 
 		std::cout << "analysing ["; cout.flush ();
@@ -39,7 +39,7 @@ int main (int argc, char* argv[]) {
 		vector<float> hann (N);
 		make_window<float>(&hann[0], N, .5, .5, 0.);
 		vector<float> target (in.getNumSamples());
-		vector<float> rebuild (in.getNumSamples());
+		vector<float> rebuild (in.getNumSamples() + N);
 		memset (&rebuild[0], 0, sizeof (float) * in.getNumSamples());
 
 		int r = in.read (&target[0], in.getNumSamples());
@@ -50,8 +50,8 @@ int main (int argc, char* argv[]) {
 			for (int i  = 0; i < N; ++i) buffer[i] = target[i + p];
 			memset(&decomposition[0], 0, sizeof (float) * decomposition.size ());
 			pursuit_decomposition<float>(dictionary, NCOMP, buffer, SR, decomposition);
-			reconstruct_from_projections (dictionary, decomposition, buffer);
-			for (int i  = 0; i < N; ++i) rebuild[i + p] += buffer[i];// * hann[i];
+			reconstruct_from_decomposition (dictionary, decomposition, buffer);
+			for (int i  = 0; i < N; ++i) rebuild[i + p] += buffer[i]; // * hann[i];
 			cout << "*"; cout.flush ();
 			p += hop;
 		}

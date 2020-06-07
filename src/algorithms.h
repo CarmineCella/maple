@@ -7,7 +7,12 @@
 
 #include "Matrix.h"
 #include "fourier.h"
+#include "WavFile.h"
+#include "TwoPoles.h"
+#include "OnePole.h"
 
+#include <sstream>
+#include <iomanip>
 #include <cmath>
 #include <pmmintrin.h>
 
@@ -82,7 +87,7 @@ void make_fourier_dictionary (DynamicMatrix<T>& mat, int J, T flimit, T SR) {
 	T f0 = SR / (T) N;
 	T fn = f0;
 	while (fn < flimit) {
-		std::cout << "fn " << fn << std::endl;
+		// std::cout << "fn " << fn << std::endl;
 		for (unsigned t = 0; t < N; ++t) {
 			buff[t] = cos (2. * M_PI * (T) t / (T) SR  * (T) fn);
 		}				
@@ -98,19 +103,19 @@ void make_gabor_dictionary (DynamicMatrix<T>& mat, int J, T fdef, T flimit, T SR
 	int N = pow (2., J);
 	std::vector<T> buff (N);
 	T comma = pow (2., 1. / fdef);
-	int j = 4;
+	int j = 5;
 	while (j <= J) {
 		int n = pow (2., j);
 		int u = 0;
 		while (u <= (N - n)) {
 			T fn = SR / (T) n;
 			while (fn < flimit) {
-				std::cout << "n = " << n << "; u = " << u << "; fn = " << fn << std::endl;
+				std::cout << "n = " << n << "; u = " << u << "; fn = " << fn <<  std::endl;
 				memset (&buff[0], 0, sizeof (T) * buff.size ());
-				make_window<T> (&buff[u], n, .5, .5, 0.);				
-				//gauss_window<T> (&buff[u], n, 8.);
+				make_window<T> (&buff[u], n, .5, .5, 0.);	
+				// gauss_window<T> (&buff[u], n, 8.);
 				for (unsigned t = 0; t < n; ++t) {
-					buff[t + u] *= cos (2. * M_PI * (T) t / (T) SR  * (T) fn);
+					buff[t + u] *=  cos ((2. * M_PI * (T) t / (T) SR  * (T) fn));
 				}				
 				T nn = norm (&buff[0], N);
 				scale<T> (&buff[0], &buff[0], N, 1. / nn);
@@ -124,10 +129,20 @@ void make_gabor_dictionary (DynamicMatrix<T>& mat, int J, T fdef, T flimit, T SR
 }
 
 template <typename T>
+void interleave (T* stereo, const T* l, const T* r, int n) {
+	for (int i = 0; i < n; ++i) {
+		stereo[2 * i] = l[i];
+		stereo[2 * i + 1] = r[i];
+	}
+}
+
+
+template <typename T>
 void pursuit_decomposition (const DynamicMatrix<T>& dictionary,
 	int iterations, const std::vector<T>& target,
 	T sr, std::vector<T>& decomposition) {
 	std::vector<T> residual (target.size ());
+	std::vector<T> norm_res (target.size ());
 	int sz = residual.size ();
 	for (unsigned i = 0; i < target.size (); ++i) {
 		residual[i] = target[i];
@@ -152,15 +167,23 @@ void pursuit_decomposition (const DynamicMatrix<T>& dictionary,
 			residual[k] -= (dictionary[max_index][k] * max_prod);
 		}
 		decomposition[max_index] = max_prod;
-		std::cout << max_index << " ";
+
+		// std::vector<T> outv (2 * sz);
+		// interleave (&outv[0], &residual[0], &dictionary[max_index][0], sz);
+
+		// std::stringstream n;
+		// n << "iteration_" << std::setw (3) << std::setfill ('0') << i << ".wav";
+		// WavOutFile ooo (n.str ().c_str (), 44100, 16, 2);
+		// ooo.write (&outv[0], sz * 2);
+
+		// std::cout << max_index << " ";
 		max_modulus = 0;
 	}
 }	
 
 template <typename T>
-void reconstruct_from_projections (const DynamicMatrix<T>& dictionary, const std::vector<T>& decomposition, 
+void reconstruct_from_decomposition (const DynamicMatrix<T>& dictionary, const std::vector<T>& decomposition, 
 	std::vector<T>& output) {
-
 	output.resize (dictionary[0].size ());
 	memset (&output[0], 0, sizeof (T) * output.size ());
 	for (unsigned i = 0; i < decomposition.size (); ++i) {
