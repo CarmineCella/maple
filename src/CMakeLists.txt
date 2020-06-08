@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8.9)
 project (mptypes)
 
-SET(CMAKE_CXX_FLAGS "-Wall -O2 -std=c++11")
+SET(CMAKE_CXX_FLAGS "-Wall -g2 -O2 -std=c++11")
 
 option(ENABLE_READLINE "Enable readline shell" OFF)
 if (ENABLE_READLINE) 

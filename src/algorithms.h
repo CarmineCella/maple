@@ -9,9 +9,18 @@
 #include "fourier.h"
 #include "WavFile.h"
 
+#include <vector>
 #include <sstream>
 #include <iomanip>
 #include <cmath>
+
+template <typename T>
+struct Atom {
+	Atom () { position = 0; weight = 1;}	
+	Atom (int p, T w) { position = p; weight = w;}
+	int position;
+	T weight;
+};
 
 template <typename T>
 T norm(const T* values,
@@ -32,6 +41,79 @@ void scale(const T* buff, T* out, int len, T factor) {
 		out[i] = buff[i] * factor;
 	}
 }
+
+template <typename T>
+inline T minimum(
+		const T* values,
+		int N, int& minPos) {
+	if (1 > N) return 0;
+
+	T min = values[0];
+	for (int i = 0; i < N; ++i) {
+		if (min > values[i]) {
+			min = values[i];
+			minPos = i;
+		}
+	}
+
+	return min;
+}
+
+template <typename T>
+inline T maximum(
+		const T* values,
+		int N, int& maxPos) {
+	if (1 > N) return 0;
+
+	T max = values[0];
+	for (int i = 0; i < N; ++i) {
+		if (max < values[i]) {
+			max = values[i];
+			maxPos = i;
+		}
+	}
+
+	return max;
+}
+
+template <typename T>
+T sum(
+		const T* values,
+		int N) {
+	if (1 > N) return 0;
+
+	T sum = 0.;
+	for (int i = 0; i < N; ++i) {
+		sum += values[i];
+	}
+
+	return sum;
+}
+
+template <typename T>
+T mean(
+		const T* values,
+		int N) {
+	if (1 > N) return 0;
+
+	return sum(values, N) / N;
+}
+
+template <typename T>
+T frand(T min, T max) {
+	return ((max - min) * ((T)rand() / RAND_MAX) + min);
+}
+template <typename T>
+int wchoice(T* dist, int n) {
+	T R = frand<T>(0., 1.);
+	for (int i = 0; i < n; ++i) {
+		if (dist[i] >= R) {
+			return i;
+		}
+	}
+	return (int) frand<double>(0, n);
+}
+
 #define FAST_DOT
 #ifdef FAST_DOT
 	#include <pmmintrin.h>
@@ -127,7 +209,7 @@ void interleave (T* stereo, const T* l, const T* r, int n) {
 template <typename T>
 void pursuit_decomposition (const DynamicMatrix<T>& dictionary,
 	int iterations, const std::vector<T>& target,
-	T sr, std::vector<T>& decomposition) {
+	T sr, std::vector<Atom<T> >& decomposition) {
 	static int fnum = 0;
 	std::vector<T> residual (target.size ());
 	for (unsigned i = 0; i < target.size (); ++i) {
@@ -153,7 +235,8 @@ void pursuit_decomposition (const DynamicMatrix<T>& dictionary,
 		for (unsigned k = 0; k < sz; ++k) {
 			residual[k] -= (dictionary[max_index][k] * max_prod);
 		}
-		decomposition[max_index] = max_prod;
+		
+		decomposition.push_back (Atom<T> (max_index, max_prod));
 // #define DEBUG_DECOMPOSITION
 #ifdef DEBUG_DECOMPOSITION
 		std::vector<T> outv (2 * sz);
@@ -171,15 +254,76 @@ void pursuit_decomposition (const DynamicMatrix<T>& dictionary,
 }	
 
 template <typename T>
-void reconstruct_from_decomposition (const DynamicMatrix<T>& dictionary, const std::vector<T>& decomposition, 
+void reconstruct_from_decomposition (const DynamicMatrix<T>& dictionary, 
+	const std::vector<Atom<T> >& decomposition, 
 	std::vector<T>& output) {
-	output.resize (dictionary[0].size ());
+	int sz = dictionary[0].size ();
+	output.resize (sz);
 	memset (&output[0], 0, sizeof (T) * output.size ());
 	for (unsigned i = 0; i < decomposition.size (); ++i) {
-		if (decomposition[i] != 0) {
-			for (unsigned t = 0; t < dictionary[i].size (); ++t) {
-				output[t] += decomposition[i] * dictionary[i][t];
-			}
+		int p = decomposition[i].position;
+		T w = decomposition[i].weight;
+		for (unsigned t = 0; t < sz; ++t) {
+			output[t] +=  w * dictionary[p][t];
+		}
+	}
+	// std::cout << std::endl;
+}
+
+template <typename T>
+void export_decomposition_channel (T SR, const DynamicMatrix<T>& dictionary, 
+	const DynamicMatrix<Atom<float> >& decompositions, 
+	int channel) {
+	std::stringstream name;
+	name << "decomp_ch_" << std::setw (4) << std::setfill ('0') << channel << ".wav";
+	WavOutFile chout (name.str ().c_str (), SR, 16, 1);
+	for (unsigned i = 0; i < decompositions.size (); ++i) {
+		int p = decompositions[i][channel].position;
+		std::vector<T> t (dictionary[p]);
+		//t[0] = -.5;
+		chout.write(&t[0], t.size ());
+	}
+}
+
+template <typename T>
+void compute_transition_model (
+	const DynamicMatrix<T>& dictionary, 
+	const DynamicMatrix<Atom<float> >& decompositions, 
+	Matrix<T>& transitions) {
+	transitions.resize(dictionary.size(), dictionary.size ());
+	int channels = decompositions[0].size ();
+	for (unsigned ch = 0; ch < channels; ++ch) {
+		for (unsigned i = 0; i < decompositions.size () - 1; ++i) {
+			int m = decompositions[i][ch].position;
+			int n = decompositions[i + 1][ch].position;
+			transitions[m][n] += 1;
+		}
+	}
+
+	// compute probabilities
+	for (unsigned i = 0; i < transitions.rows(); ++i) {
+		T s = sum<T> (transitions[i], transitions.cols());
+		if (s) scale<T> (transitions[i],transitions[i], transitions.cols (), 1. / s);
+	}
+}
+
+template <typename T>
+void generate_probabilistic_decomposition (
+	const DynamicMatrix<T>& dictionary, 
+	const Matrix<T>& transitions, int frames, 
+	int channels, DynamicMatrix<Atom <T> >& decompositions) {
+
+	T** markov = transitions.data();
+	decompositions.resize (frames);
+	for (unsigned i = 0; i < frames; ++i) {
+		decompositions[i].resize (channels);
+	}
+	for (int ch = 0; ch < channels; ++ch ) {
+		int state = rand () % dictionary.size ();
+		decompositions[0][ch].position = state;
+		for (long i = 1; i < frames; ++i) {
+			state =  wchoice (markov[state], dictionary.size ());
+			decompositions[i][ch].position = state;
 		}
 	}
 }

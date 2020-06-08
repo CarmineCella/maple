@@ -60,7 +60,7 @@ public:
     void rand () {
 		for (unsigned int i = 0; i < m_rows; ++i) { 
 			for (unsigned int j = 0; j < m_cols; ++j) {
-				m_data[i][j] = (double) std::rand () / RAND_MAX;
+				m_data[i][j] = (T) std::rand () / RAND_MAX;
 			}
 		}
     }
@@ -197,7 +197,7 @@ private:
 		m_data = new T*[m_rows];
 
 		for (unsigned int i = 0; i < m_rows; ++i) { 
-			m_data[i] = new double[m_cols];
+			m_data[i] = new T[m_cols];
 			for (unsigned int j = 0; j < m_cols; ++j) {
 				m_data[i][j] = 0;
 			}
@@ -213,7 +213,7 @@ private:
 	// private partial pivoting method
 	int pivot (int row) {
 		int k = row;
-		double amax, temp;
+		T amax, temp;
 		
 		amax = -1;
 		for (unsigned int i = row; i < m_rows; i++) {

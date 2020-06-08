@@ -1,8 +1,8 @@
 SR 				44100
 J 				12
-minj 			9
+minj 			10
 freq_limit 		16000
-components 		400
+components 		10
 oct_divisions 	48
 normalize 		1
 windowing 		1
