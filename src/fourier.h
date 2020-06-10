@@ -4,6 +4,8 @@
 #ifndef FOURIER_H
 #define FOURIER_H
 
+#include <algorithm>
+#include <iostream>
 #include <cmath>
 
 #ifndef TWOPI_H

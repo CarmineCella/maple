@@ -27,11 +27,6 @@ std::string trim (std::string const& source,
 }
 
 template <typename T>
-struct Params {
-
-};
-
-template <typename T>
 struct Parameters {
 	Parameters () {
 		setup ();
@@ -41,10 +36,29 @@ struct Parameters {
 		read (config_file);
 	}
 	void setup () {
-		SR = 44100; J = 12; minj = 5; comp = 100; oct_div = 1; normalize = 0; 
-		windowing = false; freq_limit = 15000;
-	}
+		dictionary_type = "gabor"; SR = 44100;  J = 12; minj = 8; comp = 100; oct_div = 12;
+		overlap = 4; freq_limit = 17000;
 
+		ratio = 1.;
+		stretch = 1.;
+	}
+	void print (std::ostream& out) {
+		out << "dictionary type..... " << dictionary_type << std::endl;
+		out << "sampling rate....... " << SR << " Hz" << std::endl;
+ 		out << "lowest frequency.... " << SR / pow (2., J) << " Hz" << std::endl;
+		if (dictionary_type != "fourier") {
+			out << "smallest time....... " << (T) pow (2, minj) / SR * 1000. << " ms" << std::endl;
+		}
+		if (dictionary_type != "fourier") {
+			out << "frequency factor.... " << (T) pow (2., 1. / (T) oct_div) 
+				<< " (1/" << oct_div <<  " oct)" << std::endl;
+		}
+		out << "highest frequency... " << freq_limit << " Hz" << std::endl << std::endl;
+		out << "components.......... " << comp << std::endl;
+		out << "overlap............. " << overlap << std::endl;
+		out << "pitch shift......... " << ratio << std::endl;
+		out << "time stretch........ " << stretch << std::endl << std::endl;
+ 	}
 	void read (const char* config_file) {
 		std::ifstream config (config_file);
 		if (!config.good ()) {
@@ -92,14 +106,16 @@ struct Parameters {
         	comp = atol (tokens[1].c_str ());
         } else if (tokens[0] == "oct_divisions") {
         	oct_div = atol (tokens[1].c_str ());
-        } else if (tokens[0] == "normalize") {
-        	normalize = (bool) atol (tokens[1].c_str ());
-        } else if (tokens[0] == "windowing") {
-        	windowing = (bool) atol (tokens[1].c_str ());
+        } else if (tokens[0] == "overlap") {
+        	overlap = atol (tokens[1].c_str ());
         } else if (tokens[0] == "freq_limit") {
         	freq_limit = atof (tokens[1].c_str ());
         } else if (tokens[0] == "dictionary") {
-			dictionary = tokens[1];
+			dictionary_type = tokens[1];
+        } else if (tokens[0] == "ratio") {
+        	ratio = atof (tokens[1].c_str ());
+        } else if (tokens[0] == "stretch") {
+        	stretch = atof (tokens[1].c_str ());
         } else {
             std::stringstream err;
             err << "invalid parameter " << tokens[0];
@@ -112,11 +128,31 @@ struct Parameters {
 	int minj;
 	int comp;
 	int oct_div;
-	bool normalize; 
-	bool windowing;
+	int overlap;
 	T freq_limit; 
-	std::string dictionary;
+	std::string dictionary_type;
+
+	T ratio;
+	T stretch;
 };
+
+// -----------------------------------------------------------------------------
+template <typename T>
+void interleave (T* stereo, const T* l, const T* r, int n) {
+	for (int i = 0; i < n; ++i) {
+		stereo[2 * i] = l[i];
+		stereo[2 * i + 1] = r[i];
+	}
+}
+
+template <typename T>
+void deinterleave (const T* stereo, T* l, T* r, int n) {
+	for (int i = 0; i < n; ++i) {
+		l[i] = stereo[2 * i];
+		r[i] = stereo[2 * i + 1];
+	}
+}
+
 
 #endif	// UTILS_H 
 
