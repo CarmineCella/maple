@@ -3,5 +3,5 @@ project (maple)
 
 SET(CMAKE_CXX_FLAGS "-Wall -O2 -std=c++11")
 
-add_executable(maple maple.cpp utils.h algorithms.h fourier.h WavFile.h Matrix.h TwoPoles.h)
+add_executable(maple maple.cpp utils.h algorithms.h fourier.h WavFile.h Matrix.h)
 target_link_libraries (maple dl ${LIBS})

@@ -25,7 +25,7 @@ struct Peak {
 };
 
 template <typename T>
-void make_window (T* out, int N, T a0, T a1, T a2) {
+void cosine_window (T* out, int N, T a0, T a1, T a2) {
     // .5, .5, 0     --> hanning
     // .54, .46, 0   --> hamming
     // .42, .5, 0.08 --> blackman
@@ -42,6 +42,20 @@ void gauss_window (T* win, int N, T alpha) {
 		T r = alpha * (T) n / (T)(N / 2.);
 		win[n + N2] = exp (-0.5 * r * r);
 	}
+}
+
+template <typename T>
+void gamma_window (T* win, int N, T order) {
+	for (unsigned t = 0; t < N; ++t) {
+		win[t] = pow ((T)t / N, order - 1) * exp (-2. * M_PI * (T) t / (T) N);
+	}
+	// int SMOOTH = 512 > N ? N : 512;
+	// T env = 1;
+	// T decr = 1. / (T) SMOOTH;
+	// for (unsigned  i = SMOOTH; i > 0; --i) {
+	// 	win[N - i] *= env;
+	// 	env -= decr;
+	// }
 }
 
 template <typename T>

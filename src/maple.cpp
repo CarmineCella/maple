@@ -57,7 +57,8 @@ int main (int argc, char* argv[]) {
 		clock_t tic = clock ();
 		pursuit_decomposition(p, dictionary, target, decomposition, cout);
 		clock_t toc = clock ();
-		cout << "analysing........... done (" << (float) (toc - tic) / CLOCKS_PER_SEC << " sec.)" << endl; cout.flush ();
+		cout << "analysing........... done (" << 
+			(float) (toc - tic) / CLOCKS_PER_SEC << " sec.)" << endl; cout.flush ();
 		
 		// synthesis
 		cout << "reconstructing......"; cout.flush ();
@@ -65,7 +66,8 @@ int main (int argc, char* argv[]) {
 		tic = clock ();
 		pursuit_reconstruction (p, dictionary, decomposition, rebuild);
 		toc = clock ();
-		cout << " done (" << (float) (toc - tic) / CLOCKS_PER_SEC << " sec.)" << endl; cout.flush ();
+		cout << " done (" << (float) (toc - tic) / CLOCKS_PER_SEC << " sec.)" 
+			<< endl; cout.flush ();
 
 		cout << "saving output......."; cout.flush ();
 		WavOutFile reconstruction (argv[3], p.SR, 16, 1);

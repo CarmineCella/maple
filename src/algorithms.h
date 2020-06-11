@@ -9,8 +9,6 @@
 #include "fourier.h"
 #include "utils.h"
 #include "WavFile.h"
-#include "OnePole.h"
-#include "TwoPoles.h"
 
 #include <vector>
 #include <sstream>
@@ -19,7 +17,7 @@
 #include <cmath>
 
 #define DOT_PROD_SPEED 1
-#define DEBUG_DECOMPOSITION
+// #define DEBUG_DECOMPOSITION
 
 // types
 template <typename T>
@@ -184,18 +182,9 @@ int wchoice(T* dist, int n) {
 	return (int) frand<double>(0, n);
 }
 
-template <typename T>
-void gen_mode (T sr, T freq, T decay, T* wave) {
-	TwoPoles<T> t (sr, freq, decay);
-	std::vector<T> input ((int) (sr * decay), 0);
-	input[0] = 1;
-
-	t.process (&input[0], wave, input.size ());
-}
-
 // matching pursuit
 template <typename T>
-void store_vector (std::vector<T>& atom, std::vector<T>& params,
+void store_vector (std::vector<T>& atom, std::vector<T> params,
 	Dictionary<T>& dict) {
 		int N = atom.size ();
 		T nn = norm (&atom[0], N);
@@ -208,18 +197,18 @@ void make_dictionary (const Parameters<T>& p, Dictionary<T>& dict) {
 	int N = pow (2., p.J);
 	std::vector<T> buff (N);
 	std::vector<T> cbuff (2 * N, 0);
-	if (p.dictionary_type == "cosines") {
+	if (p.dictionary_type == "cosine") {
 		T f0 = p.SR / (T) N;
 		T fn = f0;
 		while (fn < p.freq_limit) {
 			for (unsigned t = 0; t < N; ++t) {
 				buff[t] = cos (2. * M_PI * (T) t / (T) p.SR  * (T) fn);
 			}				
-			std::vector<T> par{fn, (T) N, 0.};
-			store_vector(buff, par, dict);
+			
+			store_vector(buff, std::vector<T> {fn, (T) N, 0.}, dict);
 			fn += f0;
 		}
-	} else if (p.dictionary_type == "gabor" || p.dictionary_type == "expon") {
+	} else if (p.dictionary_type == "gabor" || p.dictionary_type == "gammatone") {
 		T comma = pow (2., 1. / p.oct_div);
 
 		int j = p.minj;
@@ -229,22 +218,21 @@ void make_dictionary (const Parameters<T>& p, Dictionary<T>& dict) {
 			while (u <= (N - n)) {
 				T fn = p.SR / (T) n;
 				while (fn < p.freq_limit) {
-					// T phi_incr = 2. * M_PI / p.phi_slices;
+					T phi_incr = 2. * M_PI / p.phi_slices;
 					T phi = 0.;
-					// while (phi < 2. * M_PI) {
+					 while (phi < 2. * M_PI) {
 						memset (&buff[0], 0, sizeof (T) * buff.size ());
 						if (p.dictionary_type == "gabor") {
 							gauss_window<T> (&buff[u], n, 4.);
-							for (unsigned t = 0; t < n; ++t) {
-								buff[t + u] *=  cos ((2. * M_PI * (T) t / (T) p.SR  * (T) fn) + phi);
-							}
-						} else if (p.dictionary_type == "expon") {				
-							gen_mode(p.SR, fn, (T) n / p.SR, &buff[u]);
+						} else if (p.dictionary_type == "gammatone") {				
+							gamma_window<T>(&buff[u], n, 1.5);
 						}
-						// phi += phi_incr;
-						std::vector<T> par {fn, (T) n, (T) u};
-						store_vector(buff, par, dict);
-					// } 
+						for (unsigned t = 0; t < n; ++t) {
+							buff[t + u] *=  cos ((2. * M_PI * (T) t / (T) p.SR  * (T) fn) + phi);
+						}	
+						phi += phi_incr;
+						store_vector(buff, std::vector<T>  {fn, (T) n, (T) u}, dict);
+					} 
 					fn *= comma;
 				}
 				u += n;
@@ -339,7 +327,7 @@ void reconstruct_frame (T ratio, const Dictionary<T>& dictionary,
 	std::vector<T> window (sz);
 	for (unsigned i = 0; i < decomposition.size (); ++i) {
 		int p = decomposition[i][0]; // position
-		T w = decomposition[i][1]; // weight
+		T w = decomposition[i][1];  // weight
 		T* ptr = (T*) &dictionary.atoms[p][0];
 		if (ratio != 1.) {
 			int nsamp = (int) ((T) sz * ratio);
@@ -371,7 +359,7 @@ void pursuit_reconstruction (const Parameters<T>& p, const Dictionary<T>& dictio
 	std::vector<T> buffer (N);
 	std::vector<T> hann (N, 1.);
 	if (p.overlap > 1) {
-		make_window<T>(&hann[0], N, .5, .5, 0.);
+		cosine_window<T>(&hann[0], N, .5, .5, 0.);
 	}	
 	int samples = (int) ((T) decomposition.size () * hop);
 	output.resize (samples + N, 0);

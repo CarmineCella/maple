@@ -1,11 +1,12 @@
-dictionary 		expon
+dictionary 		gammatone
 SR 				44100
 J 				12
 minj 			10
-oct_divisions 	48
+oct_divisions 	60
+phi_slices		1
 freq_limit 		16000
 
-components 		100
+components 		20
 overlap 		4
 
 ratio			1
