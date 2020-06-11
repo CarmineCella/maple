@@ -10,6 +10,7 @@
 #include <deque>
 #include <sstream>
 #include <stdexcept>
+#include <cmath>
 
 std::string trim (std::string const& source,
 	char const* delims = " \t\r\n") {
@@ -37,6 +38,7 @@ struct Parameters {
 	}
 	void setup () {
 		dictionary_type = "gabor"; SR = 44100;  J = 12; minj = 8; comp = 100; oct_div = 12;
+		// phi_slices = 4;	
 		overlap = 4; freq_limit = 17000;
 
 		ratio = 1.;
@@ -46,12 +48,11 @@ struct Parameters {
 		out << "dictionary type..... " << dictionary_type << std::endl;
 		out << "sampling rate....... " << SR << " Hz" << std::endl;
  		out << "lowest frequency.... " << SR / pow (2., J) << " Hz" << std::endl;
-		if (dictionary_type != "fourier") {
+		if (dictionary_type != "cosine") {
 			out << "smallest time....... " << (T) pow (2, minj) / SR * 1000. << " ms" << std::endl;
-		}
-		if (dictionary_type != "fourier") {
 			out << "frequency factor.... " << (T) pow (2., 1. / (T) oct_div) 
 				<< " (1/" << oct_div <<  " oct)" << std::endl;
+			// out << "phase factor........ " << 2. * M_PI / phi_slices << std::endl;
 		}
 		out << "highest frequency... " << freq_limit << " Hz" << std::endl << std::endl;
 		out << "components.......... " << comp << std::endl;
@@ -106,7 +107,11 @@ struct Parameters {
         	comp = atol (tokens[1].c_str ());
         } else if (tokens[0] == "oct_divisions") {
         	oct_div = atol (tokens[1].c_str ());
-        } else if (tokens[0] == "overlap") {
+        } 
+        // else if (tokens[0] == "phi_slices") {
+        // 	phi_slices = atol (tokens[1].c_str ());
+        // } 
+        else if (tokens[0] == "overlap") {
         	overlap = atol (tokens[1].c_str ());
         } else if (tokens[0] == "freq_limit") {
         	freq_limit = atof (tokens[1].c_str ());
@@ -128,6 +133,7 @@ struct Parameters {
 	int minj;
 	int comp;
 	int oct_div;
+	// int phi_slices;
 	int overlap;
 	T freq_limit; 
 	std::string dictionary_type;

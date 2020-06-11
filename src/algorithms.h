@@ -9,6 +9,8 @@
 #include "fourier.h"
 #include "utils.h"
 #include "WavFile.h"
+#include "OnePole.h"
+#include "TwoPoles.h"
 
 #include <vector>
 #include <sstream>
@@ -17,13 +19,13 @@
 #include <cmath>
 
 #define DOT_PROD_SPEED 1
-//#define DEBUG_DECOMPOSITION
+#define DEBUG_DECOMPOSITION
 
 // types
 template <typename T>
 struct Dictionary {
-	DynamicMatrix<float> atoms;
-	DynamicMatrix<float> parameters;
+	DynamicMatrix<T> atoms;
+	DynamicMatrix<T> parameters;
 };
 template <typename T>
 using Decomposition = std::vector<DynamicMatrix<T> >;
@@ -140,6 +142,31 @@ T mean(
 	#error DOT_PROD_SPEED_INVALID
 #endif
 
+template <typename T>
+void gram_schmidt (const Matrix<T>& matrix, Matrix<T>& base) {
+	int dim = matrix.cols (); // must be squared
+   	Matrix<T> r (matrix);
+    Matrix<T> v (dim, dim);
+
+    for (int i = 0; i < dim; ++i) {
+        for (int j = 0; j < dim; ++j) {
+            v[i][j] = matrix[i][j];
+        }
+    }
+
+    for (int i = 0; i < dim; ++i) {
+        r[i][i] = norm (&v[i][0], v.size ());
+        for (int j = 0; j < dim; ++j) {
+            base[i][j] = v[i][j] / r[i][i];
+        }
+        for (int k = i + 1;  k < dim; ++k) {
+            r[i][k] = dot_product (&base[i][0], &v[k][0], base[i].size ());
+            for (int j=0; j < dim; ++j) {
+                v[k][j] = v[k][j] - r[i][k] * base[i][j];
+            }
+        }
+    }
+}
 
 // others
 template <typename T>
@@ -157,26 +184,42 @@ int wchoice(T* dist, int n) {
 	return (int) frand<double>(0, n);
 }
 
+template <typename T>
+void gen_mode (T sr, T freq, T decay, T* wave) {
+	TwoPoles<T> t (sr, freq, decay);
+	std::vector<T> input ((int) (sr * decay), 0);
+	input[0] = 1;
+
+	t.process (&input[0], wave, input.size ());
+}
+
 // matching pursuit
+template <typename T>
+void store_vector (std::vector<T>& atom, std::vector<T>& params,
+	Dictionary<T>& dict) {
+		int N = atom.size ();
+		T nn = norm (&atom[0], N);
+		scale<T> (&atom[0], &atom[0], (T) N, 1. / nn);
+		dict.atoms.push_back (atom);
+		dict.parameters.push_back (params);
+}
 template <typename T>
 void make_dictionary (const Parameters<T>& p, Dictionary<T>& dict) {
 	int N = pow (2., p.J);
 	std::vector<T> buff (N);
 	std::vector<T> cbuff (2 * N, 0);
-	if (p.dictionary_type == "fourier") {
+	if (p.dictionary_type == "cosines") {
 		T f0 = p.SR / (T) N;
 		T fn = f0;
 		while (fn < p.freq_limit) {
 			for (unsigned t = 0; t < N; ++t) {
 				buff[t] = cos (2. * M_PI * (T) t / (T) p.SR  * (T) fn);
 			}				
-			T nn = norm (&buff[0], N);
-			scale<T> (&buff[0], &buff[0], N, 1. / nn);
-			dict.atoms.push_back (buff);
-			dict.parameters.push_back (std::vector<T>{fn, (T) N, (T) 0});
+			std::vector<T> par{fn, (T) N, 0.};
+			store_vector(buff, par, dict);
 			fn += f0;
 		}
-	} else if (p.dictionary_type == "gabor") {
+	} else if (p.dictionary_type == "gabor" || p.dictionary_type == "expon") {
 		T comma = pow (2., 1. / p.oct_div);
 
 		int j = p.minj;
@@ -185,22 +228,24 @@ void make_dictionary (const Parameters<T>& p, Dictionary<T>& dict) {
 			int u = 0;
 			while (u <= (N - n)) {
 				T fn = p.SR / (T) n;
-				// T f0 = p.SR / (T) N;
-				// T fn = f0;
 				while (fn < p.freq_limit) {
-					memset (&buff[0], 0, sizeof (T) * buff.size ());
-					make_window<T> (&buff[u], n, .5, .5, 0.);	
-					// gauss_window<T> (&buff[u], n, 4.);
-					for (unsigned t = 0; t < n; ++t) {
-						buff[t + u] *=  cos ((2. * M_PI * (T) t / (T) p.SR  * (T) fn));
-					}				
-					T nn = norm (&buff[0], N);
-					scale<T> (&buff[0], &buff[0], N, 1. / nn);
-					dict.atoms.push_back (buff);							
-			
-					dict.parameters.push_back (std::vector<T>{fn, (T) n, (T) u});
+					// T phi_incr = 2. * M_PI / p.phi_slices;
+					T phi = 0.;
+					// while (phi < 2. * M_PI) {
+						memset (&buff[0], 0, sizeof (T) * buff.size ());
+						if (p.dictionary_type == "gabor") {
+							gauss_window<T> (&buff[u], n, 4.);
+							for (unsigned t = 0; t < n; ++t) {
+								buff[t + u] *=  cos ((2. * M_PI * (T) t / (T) p.SR  * (T) fn) + phi);
+							}
+						} else if (p.dictionary_type == "expon") {				
+							gen_mode(p.SR, fn, (T) n / p.SR, &buff[u]);
+						}
+						// phi += phi_incr;
+						std::vector<T> par {fn, (T) n, (T) u};
+						store_vector(buff, par, dict);
+					// } 
 					fn *= comma;
-					// fn += f0;
 				}
 				u += n;
 			}
@@ -222,13 +267,13 @@ void decompose_frame (T sr, int components, const Dictionary<T>& dictionary,
 	T max_modulus = 0;
 	T max_prod = 0;
 	int max_index = 0;
-
+	static int fnum = 0;
 	for (unsigned i = 0; i < components; ++i) {		
 		for (unsigned k = 0; k < dictionary.atoms.size (); ++k) {
 			int n = dictionary.parameters[k][1];
 			int u = dictionary.parameters[k][2];
 			const T* proj = &dictionary.atoms[k][u];
-			T d = (dot_prod (input, proj, n));
+			T d = (dot_prod (input + u, proj, n));
 			T mod = fabs (d);
 
 			if (mod > max_modulus) {
@@ -245,21 +290,23 @@ void decompose_frame (T sr, int components, const Dictionary<T>& dictionary,
 		frame.push_back (std::vector<T> {(T) max_index, max_prod});
 
 #ifdef DEBUG_DECOMPOSITION
+		int sz = residual.size ();
 		std::vector<T> outv (2 * sz);
 		interleave (&outv[0], &residual[0], &dictionary.atoms[max_index][0], sz);
 
-		std::stringstream n;
-		n << "iteration_" << fnum << "_" << std::setw (3) << std::setfill ('0') << i << ".wav";
-		WavOutFile ooo (n.str ().c_str (), 44100, 16, 2);
+		std::stringstream name;
+		name << "iteration_" << fnum << "_" << std::setw (3) << std::setfill ('0') << i << ".wav";
+		WavOutFile ooo (name.str ().c_str (), 44100, 16, 2);
 		ooo.write (&outv[0], sz * 2);
 #endif
 		// std::cout << max_index << " " << max_prod << std::endl;
 		max_modulus = 0;
 	}
+	++fnum;
 }	
 
 template <typename T>
-void pursuit_decomposition (const Parameters<float>& p, const Dictionary<T>& dictionary, 
+void pursuit_decomposition (const Parameters<T>& p, const Dictionary<T>& dictionary, 
 	const std::vector<T>& target, Decomposition<T>& decomposition, std::ostream& out) {
 	int ptr = 0;
 	int N = pow (2., p.J);
@@ -267,16 +314,16 @@ void pursuit_decomposition (const Parameters<float>& p, const Dictionary<T>& dic
 	std::vector<T> buffer (N);
 	int r = target.size ();
 	while (ptr < r) {
+		int perc = (int) ((T) ptr / r * 100.); 
+		if (perc % 10 == 0) {
+			out << "analysing........... " << perc << "%\r"; out.flush ();
+		}		
 		for (int i  = 0; i < N; ++i) {
 			if (i + ptr >= r) buffer[i] = 0;
 			else buffer[i] = target[i + ptr];
 		}
-		DynamicMatrix<float> frame;
-		decompose_frame<float>(p.SR, p.comp, dictionary, buffer, frame);
-		int perc = (int) ((float) ptr / r * 100.); 
-		if (perc % 10 == 0) {
-			out << "analysing........... " << perc << "%\r"; out.flush ();
-		}
+		DynamicMatrix<T> frame;
+		decompose_frame<T>(p.SR, p.comp, dictionary, buffer, frame);
 		ptr += hop;
 		decomposition.push_back(frame);
 	}
@@ -308,6 +355,7 @@ void reconstruct_frame (T ratio, const Dictionary<T>& dictionary,
 			}
 			ptr = &buff[0];
 		} 
+
 		for (unsigned t = 0; t < sz; ++t) {
 			output[t] +=  w * ptr[t];
 		}
@@ -321,17 +369,17 @@ void pursuit_reconstruction (const Parameters<T>& p, const Dictionary<T>& dictio
 	int N = pow (2., p.J);
 	int hop = N / p.overlap;	
 	std::vector<T> buffer (N);
-	std::vector<float> hann (N, 1.);
+	std::vector<T> hann (N, 1.);
 	if (p.overlap > 1) {
-		make_window<float>(&hann[0], N, .5, .5, 0.);
+		make_window<T>(&hann[0], N, .5, .5, 0.);
 	}	
 	int samples = (int) ((T) decomposition.size () * hop);
 	output.resize (samples + N, 0);
-	memset (&output[0], 0, sizeof (float) * samples);
+	memset (&output[0], 0, sizeof (T) * samples);
 	int ptr = 0;
 	for (unsigned i = 0; i < decomposition.size (); ++i) {
 		reconstruct_frame (p.ratio, dictionary, decomposition[i], buffer);
-		for (int i  = 0; i < N; ++i) output[i + ptr] += (buffer[i] * hann[i] / (float) p.overlap);
+		for (int i  = 0; i < N; ++i) output[i + ptr] += (buffer[i] * hann[i] / (T) p.overlap);
 		ptr += hop;
 	}
 }

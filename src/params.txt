@@ -1,11 +1,11 @@
-dictionary 		gabor
+dictionary 		expon
 SR 				44100
 J 				12
 minj 			10
-freq_limit 		17000
-oct_divisions 	120
+oct_divisions 	48
+freq_limit 		16000
 
-components 		2000
+components 		100
 overlap 		4
 
 ratio			1

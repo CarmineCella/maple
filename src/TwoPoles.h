@@ -14,6 +14,10 @@ public:
         m_sr = sr;
 		reset (110, 1.5);
     }
+    TwoPoles (T sr, T frequency, T tau) {
+        m_sr = sr;
+        reset (frequency, tau);
+    }
     virtual ~TwoPoles () {}
     void reset (T frequency, T tau) {
         T om = 2 * M_PI * (frequency / m_sr);

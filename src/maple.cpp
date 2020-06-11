@@ -36,7 +36,7 @@ int main (int argc, char* argv[]) {
 		Dictionary<float> dictionary;
 		cout << "making dictionary..."; cout.flush();
 		make_dictionary<float>(p, dictionary);
-		std::cout << " done (" << dictionary.atoms.size () << " atoms)";
+		std::cout << " done (" << dictionary.atoms.size () << " atoms)" << std::endl;
 		cout << "saving dictionary..."; cout.flush();
 		WavOutFile dict ("dictionary_atoms.wav", p.SR, 16, 1);
 		for (unsigned i = 0; i < dictionary.atoms.size (); ++i) {
