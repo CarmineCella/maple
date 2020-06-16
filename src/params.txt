@@ -1,4 +1,4 @@
-dictionary 		gammatone
+dictionary 		gabor
 SR 				44100
 J 				12
 minj 			10

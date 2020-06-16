@@ -218,7 +218,7 @@ void make_dictionary (const Parameters<T>& p, Dictionary<T>& dict) {
 			while (u <= (N - n)) {
 				T fn = p.SR / (T) n;
 				while (fn < p.freq_limit) {
-					T phi_incr = 2. * M_PI / p.phi_slices;
+					T phi_incr = 2. * M_PI / p.phi_slices; // PI?
 					T phi = 0.;
 					 while (phi < 2. * M_PI) {
 						memset (&buff[0], 0, sizeof (T) * buff.size ());
@@ -235,7 +235,7 @@ void make_dictionary (const Parameters<T>& p, Dictionary<T>& dict) {
 					} 
 					fn *= comma;
 				}
-				u += n;
+				u += n; // IS IT ENOUGH?
 			}
 			++j;
 		}
@@ -345,7 +345,7 @@ void reconstruct_frame (T ratio, const Dictionary<T>& dictionary,
 		} 
 
 		for (unsigned t = 0; t < sz; ++t) {
-			output[t] +=  w * ptr[t];
+			output[t] +=  w * ptr[t]; // PSI TILDE? DUAL?
 		}
 	}
 	// std::cout << std::endl;

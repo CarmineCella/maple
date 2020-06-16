@@ -60,6 +60,16 @@ int main (int argc, char* argv[]) {
 		cout << "analysing........... done (" << 
 			(float) (toc - tic) / CLOCKS_PER_SEC << " sec.)" << endl; cout.flush ();
 		
+		cout << "saving analysis..... "; cout.flush ();
+		ofstream decomp_out ("decomposition.txt");
+		for (unsigned i = 0; i < p.comp; ++i) {
+			for (unsigned j = 0; j < decomposition.size (); ++j) {
+				decomp_out << decomposition[j][i][1] << " ";
+			}
+			decomp_out << endl;
+		}
+		cout << "done" << endl;
+
 		// synthesis
 		cout << "reconstructing......"; cout.flush ();
 		vector<float> rebuild;
