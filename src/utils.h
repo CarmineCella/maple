@@ -37,23 +37,24 @@ struct Parameters {
 		read (config_file);
 	}
 	void setup () {
-		dictionary_type = "gabor"; SR = 44100;  J = 12; minj = 8; comp = 100; oct_div = 12;
+		window_type = "gabor"; SR = 44100;  J = 12; minj = 8; comp = 100; 
+		harm_coeff = 1;
+		geom_coeff = 0;
 		phi_slices = 4;	
 		overlap = 4; freq_limit = 17000;
 
 		ratio = 1.;
 		stretch = 1.;
+		threshold = 0.;
 	}
 	void print (std::ostream& out) {
-		out << "dictionary type..... " << dictionary_type << std::endl;
+		out << "dictionary type..... " << window_type << std::endl;
 		out << "sampling rate....... " << SR << " Hz" << std::endl;
  		out << "lowest frequency.... " << SR / pow (2., J) << " Hz" << std::endl;
-		if (dictionary_type != "cosine") {
-			out << "smallest time....... " << (T) pow (2, minj) / SR * 1000. << " ms" << std::endl;
-			out << "frequency factor.... " << (T) pow (2., 1. / (T) oct_div) 
-				<< " (1/" << oct_div <<  " oct)" << std::endl;
-			out << "phase factor........ " << 2. * M_PI / phi_slices << std::endl;
-		}
+		out << "smallest time....... " << (T) pow (2, minj) / SR * 1000. << " ms" << std::endl;
+		out << "harmonic coeff...... " << harm_coeff << std::endl;
+		out << "geometric coeff..... " << geom_coeff << std::endl;
+		out << "phase step.......... " << 2. * M_PI / phi_slices << "/" << 2. * M_PI << std::endl;
 		out << "highest frequency... " << freq_limit << " Hz" << std::endl << std::endl;
 		out << "components.......... " << comp << std::endl;
 		out << "overlap............. " << overlap << std::endl;
@@ -105,22 +106,25 @@ struct Parameters {
         	minj = atol (tokens[1].c_str ());
         } else if (tokens[0] == "components") {
         	comp = atol (tokens[1].c_str ());
-        } else if (tokens[0] == "oct_divisions") {
-        	oct_div = atol (tokens[1].c_str ());
-        } 
-        else if (tokens[0] == "phi_slices") {
+        } else if (tokens[0] == "harm_coeff") {
+        	harm_coeff = atof (tokens[1].c_str ());
+        } else if (tokens[0] == "geom_coeff") {
+        	geom_coeff = atof (tokens[1].c_str ());
+        } else if (tokens[0] == "phi_slices") {
         	phi_slices = atol (tokens[1].c_str ());
         } 
         else if (tokens[0] == "overlap") {
         	overlap = atol (tokens[1].c_str ());
         } else if (tokens[0] == "freq_limit") {
         	freq_limit = atof (tokens[1].c_str ());
-        } else if (tokens[0] == "dictionary") {
-			dictionary_type = tokens[1];
+        } else if (tokens[0] == "window") {
+			window_type = tokens[1];
         } else if (tokens[0] == "ratio") {
         	ratio = atof (tokens[1].c_str ());
         } else if (tokens[0] == "stretch") {
         	stretch = atof (tokens[1].c_str ());
+        } else if (tokens[0] == "threshold") {
+        	threshold = atof (tokens[1].c_str ());
         } else {
             std::stringstream err;
             err << "invalid parameter " << tokens[0];
@@ -132,11 +136,13 @@ struct Parameters {
 	int J;
 	int minj;
 	int comp;
-	int oct_div;
+	T harm_coeff;
+	T geom_coeff;
 	int phi_slices;
 	int overlap;
 	T freq_limit; 
-	std::string dictionary_type;
+	T threshold;
+	std::string window_type;
 
 	T ratio;
 	T stretch;

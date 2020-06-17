@@ -22,7 +22,10 @@
 // types
 template <typename T>
 struct Dictionary {
+	T SR;
+	std::string type;
 	DynamicMatrix<T> atoms;
+	DynamicMatrix<T> windows;
 	DynamicMatrix<T> parameters;
 };
 template <typename T>
@@ -184,67 +187,62 @@ int wchoice(T* dist, int n) {
 
 // matching pursuit
 template <typename T>
-void store_vector (std::vector<T>& atom, std::vector<T> params,
-	Dictionary<T>& dict) {
-		int N = atom.size ();
-		T nn = norm (&atom[0], N);
-		scale<T> (&atom[0], &atom[0], (T) N, 1. / nn);
-		dict.atoms.push_back (atom);
-		dict.parameters.push_back (params);
-}
-template <typename T>
 void make_dictionary (const Parameters<T>& p, Dictionary<T>& dict) {
 	int N = pow (2., p.J);
 	std::vector<T> buff (N);
 	std::vector<T> cbuff (2 * N, 0);
-	if (p.dictionary_type == "cosine") {
-		T f0 = p.SR / (T) N;
-		T fn = f0;
-		while (fn < p.freq_limit) {
-			for (unsigned t = 0; t < N; ++t) {
-				buff[t] = cos (2. * M_PI * (T) t / (T) p.SR  * (T) fn);
-			}				
-			
-			store_vector(buff, std::vector<T> {fn, (T) N, 0.}, dict);
-			fn += f0;
-		}
-	} else if (p.dictionary_type == "gabor" || p.dictionary_type == "gammatone") {
-		T comma = pow (2., 1. / p.oct_div);
+	dict.type = p.window_type;
+	dict.SR = p.SR;
 
-		int j = p.minj;
-		while (j <= p.J) {
-			int n = pow (2., j);
-			int u = 0;
-			while (u <= (N - n)) {
-				T fn = p.SR / (T) n;
-				while (fn < p.freq_limit) {
-					T phi_incr = 2. * M_PI / p.phi_slices; // PI?
-					T phi = 0.;
-					 while (phi < 2. * M_PI) {
-						memset (&buff[0], 0, sizeof (T) * buff.size ());
-						if (p.dictionary_type == "gabor") {
-							gauss_window<T> (&buff[u], n, 4.);
-						} else if (p.dictionary_type == "gammatone") {				
-							gamma_window<T>(&buff[u], n, 1.5);
-						}
-						for (unsigned t = 0; t < n; ++t) {
-							buff[t + u] *=  cos ((2. * M_PI * (T) t / (T) p.SR  * (T) fn) + phi);
-						}	
-						phi += phi_incr;
-						store_vector(buff, std::vector<T>  {fn, (T) n, (T) u}, dict);
-					} 
-					fn *= comma;
-				}
-				u += n; // IS IT ENOUGH?
+	int j = p.minj;
+	while (j <= p.J) {
+		int n = pow (2., j);
+		int u = 0;
+		while (u <= (N - n)) {
+			T f0 = p.SR / (T) n;
+			T fn = f0;
+			int part = 1;
+			while (fn < p.freq_limit) {
+				T phi_incr = 2. * M_PI / p.phi_slices; // PI?
+				T phi = 0.;
+				 while (phi < 2. * M_PI) {
+					memset (&buff[0], 0, sizeof (T) * buff.size ());
+					if (p.window_type == "none") {
+						for (unsigned i = u; i < n; ++i) buff[i] = 1.;
+					} else if (p.window_type == "gauss") {
+						gauss_window<T> (&buff[u], n, 4.);
+					} else if (p.window_type == "hann") {				
+						cosine_window<T>(&buff[u], n, .5, .5, 0.);
+					} else if (p.window_type == "blackman") {				
+						cosine_window<T>(&buff[u], n, .42, .5, 0.08);
+					} else if (p.window_type == "gammatone") {				
+						gamma_window<T>(&buff[u], n, 1.5);
+					} else {
+						throw std::runtime_error ("invalid window type");
+					}
+					T nn = norm (&buff[0], N);
+					scale<T> (&buff[0], &buff[0], (T) N, 1. / nn);					
+					dict.windows.push_back (buff);
+					for (unsigned t = 0; t < n; ++t) {
+						buff[t + u] *=  cos ((2. * M_PI * (T) t / (T) p.SR  * (T) fn) + phi);
+					}	
+					phi += phi_incr;
+					nn = norm (&buff[0], N);
+					scale<T> (&buff[0], &buff[0], (T) N, 1. / nn);
+					dict.atoms.push_back (buff);
+					dict.parameters.push_back (std::vector<T>{fn, (T) n, (T) u});
+				} 
+				fn = f0 * pow (part, p.harm_coeff) * pow (p.geom_coeff, part);
+				++part;
 			}
-			++j;
+			u += n; // IS IT ENOUGH?
 		}
-	} else {
-		throw std::runtime_error ("invalid dictionary type");
+		++j;
 	}
+
 }
 template <typename T>
-void decompose_frame (T sr, int components, const Dictionary<T>& dictionary,
+void decompose_frame (T sr, T threshold, int components, const Dictionary<T>& dictionary,
 	const std::vector<T>& target, DynamicMatrix<T>& frame) {
 	std::vector<T> residual (target.size (), 0);
 	for (unsigned i = 0; i < target.size (); ++i) {
@@ -262,7 +260,9 @@ void decompose_frame (T sr, int components, const Dictionary<T>& dictionary,
 			int u = dictionary.parameters[k][2];
 			const T* proj = &dictionary.atoms[k][u];
 			T d = (dot_prod (input + u, proj, n));
+
 			T mod = fabs (d);
+			if (mod < threshold) continue;
 
 			if (mod > max_modulus) {
 				max_modulus = mod;
@@ -298,7 +298,7 @@ void pursuit_decomposition (const Parameters<T>& p, const Dictionary<T>& diction
 	const std::vector<T>& target, Decomposition<T>& decomposition, std::ostream& out) {
 	int ptr = 0;
 	int N = pow (2., p.J);
-	int hop = (int) ((T) (N / p.overlap) * p.stretch);	
+	int hop = (int) ((T) (N / p.overlap) / p.stretch);	
 	std::vector<T> buffer (N);
 	int r = target.size ();
 	while (ptr < r) {
@@ -311,7 +311,7 @@ void pursuit_decomposition (const Parameters<T>& p, const Dictionary<T>& diction
 			else buffer[i] = target[i + ptr];
 		}
 		DynamicMatrix<T> frame;
-		decompose_frame<T>(p.SR, p.comp, dictionary, buffer, frame);
+		decompose_frame<T>(p.SR, p.threshold, p.comp, dictionary, buffer, frame);
 		ptr += hop;
 		decomposition.push_back(frame);
 	}
@@ -319,33 +319,20 @@ void pursuit_decomposition (const Parameters<T>& p, const Dictionary<T>& diction
 
 template <typename T>
 void reconstruct_frame (T ratio, const Dictionary<T>& dictionary, 
-	const DynamicMatrix<T>& decomposition, std::vector<T>& output) {
-	int sz = dictionary.atoms[0].size ();
-	output.resize (sz);
-	memset (&output[0], 0, sizeof (T) * output.size ());
-	std::vector<T> buff;
-	std::vector<T> window (sz);
+	const DynamicMatrix<T>& decomposition, T* output, int ptr) {
 	for (unsigned i = 0; i < decomposition.size (); ++i) {
 		int p = decomposition[i][0]; // position
 		T w = decomposition[i][1];  // weight
-		T* ptr = (T*) &dictionary.atoms[p][0];
-		if (ratio != 1.) {
-			int nsamp = (int) ((T) sz * ratio);
-			buff.resize (nsamp + 1, 0);
-			T phi = 0;
-			for (unsigned t = 0; t < nsamp; ++t) {
-				int index = (int) phi;
-				T frac = phi - index;
-				int next = index == sz - 1 ? 0 : index + 1;
-				buff[t] = dictionary.atoms[p][index] * (1. - frac) + dictionary.atoms[p][next] * frac;
-				phi += ratio;
-				if (phi >= sz) phi -= sz;
-			}
-			ptr = &buff[0];
-		} 
 
-		for (unsigned t = 0; t < sz; ++t) {
-			output[t] +=  w * ptr[t]; // PSI TILDE? DUAL?
+		T SR = dictionary.SR;
+		T fn = dictionary.parameters[p][0];
+		int n = dictionary.parameters[p][1];
+		int u = dictionary.parameters[p][2];
+
+		for (int t = 0; t < n; ++t) {
+			output[t + ptr + u] +=  w * 
+				cos (2. * M_PI * ((T) t + (T) ptr + (T) u) / SR * fn * ratio) *
+				dictionary.windows[p][u + t]; // PHI TILDE? DUAL?	
 		}
 	}
 	// std::cout << std::endl;
@@ -356,20 +343,16 @@ void pursuit_reconstruction (const Parameters<T>& p, const Dictionary<T>& dictio
 	const Decomposition<T>& decomposition, 	std::vector<T>& output) {
 	int N = pow (2., p.J);
 	int hop = N / p.overlap;	
-	std::vector<T> buffer (N);
-	std::vector<T> hann (N, 1.);
-	if (p.overlap > 1) {
-		cosine_window<T>(&hann[0], N, .5, .5, 0.);
-	}	
+
 	int samples = (int) ((T) decomposition.size () * hop);
 	output.resize (samples + N, 0);
 	memset (&output[0], 0, sizeof (T) * samples);
 	int ptr = 0;
 	for (unsigned i = 0; i < decomposition.size (); ++i) {
-		reconstruct_frame (p.ratio, dictionary, decomposition[i], buffer);
-		for (int i  = 0; i < N; ++i) output[i + ptr] += (buffer[i] * hann[i] / (T) p.overlap);
+		reconstruct_frame (p.ratio, dictionary, decomposition[i], &output[0], ptr);
 		ptr += hop;
 	}
+	for (int i  = 0; i < samples; ++i) output[i] /=  (T) p.overlap;	
 }
 
 template <typename T>
