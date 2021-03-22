@@ -1,6 +1,6 @@
 # [Maple]
 
-Maple is an experimental framework for high quality sound processing based on time/frequency decomposition.
+Maple is an experimental framework for sound processing based on time/frequency decomposition and dictionary learning.
 
 
 For more information, please contact the author at carmine.emanuele.cella@gmail.com
