@@ -1,20 +1,49 @@
-;dictionary 		onsets ../../dict .2 .1
-;dictionary 		frames ../../dict 
-;dictionary 		onsets  /Users/Carmine/Projects/Media/Sounds/Samples/drums .2 .1
-dictionary          frames /Users/Carmine/Projects/Media/Datasets/TinySOL/Winds/ClBb
+; ------------
+; maple config
+; ------------
+
+; set dictionary type [gabor, gammatone, cosine, frames, onsets]
+; for onsets and frames you need to specify the folder containing the samples (only mono files 16 bit)
+; for onsets you need to specify also the threshold (0-1) and the timegate (sec.) for the segmentation
+;dictionary 		onsets ../../dict2 .1 .01
+;dictionary 		onsets ../../dict .4 .01
+;dictionary 		frames ../../dict2
+;dictionary          frames /Users/Carmine/Projects/Media/Datasets/TinySOL/Winds/ClBb
+;dictionary          frames /Users/Carmine/Projects/Media/Datasets/TinySOL/Brass/Hn
+;dictionary          onsets /Users/Carmine/Projects/Media/Sounds/Samples/instruments .1 .01
 ;dictionary          frames /Users/Carmine/Projects/Media/Sounds/Samples/instruments
 ;dictionary          frames ../../dict
 ;dictionary      gabor
+;dictionary      cosine
+;dictionary      gammatone
+
+; these parameters are used by all the dictionary types
+; J is the lowest frequency supported (1. / 2^J), suggested 10-12
+; freq_limit is used to determine the highest frequency (centroid for frames and onsets)
 SR 				44100
 J 				12
+freq_limit 		16000
 
+; these are the threshold (0-1) and timegate (sec.) parameters for the the segmetnation of the target
+; (used only if the dictionary is 'onsets')
+segmentation    .01 .01
+
+; these parameters are used only for gabor and gammatone dictionaries
+; minj is the smallest timescale supported (2^minj), suggested 8-10
+; for musical signals use oct_divisions 48-60, otherwise 1-12
+; do not change phi_slices
 minj 			10
 oct_divisions 	60
 phi_slices		1
-freq_limit 		16000
 
-components 		8
-overlap 		4
+; use 60-120 components for dictionaries gabor, cosine and gammatone
+; use 1-6 components for dictionaries frames and onsets
+; use 4-8 overlap factor
+components 		100
+overlap 		8
 
+; pitch shift and time stretch
 ratio			1
 stretch			1
+
+

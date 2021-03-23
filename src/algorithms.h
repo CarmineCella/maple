@@ -16,8 +16,6 @@
 #include <stdexcept>
 #include <cmath>
 
-// TODO: use speedy version for non onsets; rename functions using "segments"
-#define DOT_PROD_SPEED 0
 // #define DEBUG_DECOMPOSITION
 
 // types
@@ -102,44 +100,42 @@ T mean(
 	return sum(values, N) / N;
 }
 
-#if DOT_PROD_SPEED == 0 // naive dot product
-	template <typename T>
-	T dot_prod (const T* a, const T* b, int size) {
-		// NB: it assumes vector have the same size
-		T sum = 0;
+typedef float (*dot_function)(const float*, const float*, int);
 
-		for (int i = 0; i < size; ++i) {
-			sum += a[i] * b[i];
-		}
-		return sum;
-		if (std::isinf(sum)) return 0;
-		else return sum;
+template <typename T>
+T dot_prod (const T* a, const T* b, int size) {
+	// NB: it assumes vector have the same size
+	T sum = 0;
+
+	for (int i = 0; i < size; ++i) {
+		sum += a[i] * b[i];
 	}
-#elif DOT_PROD_SPEED == 1 // SSE3 dot product
-	#include <pmmintrin.h>
-	float dot_prod (const float *a, const float *b, int len) {
-		float total;
-		int i;
-		__m128 num1, num2, num3, num4;
-		num4= _mm_setzero_ps();  			//sets sum to zero
-		for(i=0; i<len; i+=4) {
-			num1 = _mm_loadu_ps(a+i);   	//loads unaligned array a into num1  
-											// num1= a[3]  a[2]  a[1]  a[0]
-			num2 = _mm_loadu_ps(b+i);   	//loads unaligned array b into num2 
-											// num2= b[3]   b[2]   b[1]  b[0]
-			num3 = _mm_mul_ps(num1, num2); 	//performs multiplication   
-											// num3 = a[3]*b[3]  a[2]*b[2]  a[1]*b[1]  a[0]*b[0]
-			num3 = _mm_hadd_ps(num3, num3); //performs horizontal addition
-		    			                  	//num3 =  a[3]*b[3]+ a[2]*b[2]  a[1]*b[1]+a[0]*b[0]  a[3]*b[3]+ a[2]*b[2]  a[1]*b[1]+a[0]*b[0]
-			num4 = _mm_add_ps(num4, num3);  //performs vertical addition
-		}
-		num4= _mm_hadd_ps(num4, num4);
-		_mm_store_ss(&total,num4);
-		return total;
+	return sum;
+	if (std::isinf(sum)) return 0;
+	else return sum;
+}
+
+#include <pmmintrin.h>
+float dot_prod_sse (const float *a, const float *b, int len) {
+	float total;
+	int i;
+	__m128 num1, num2, num3, num4;
+	num4= _mm_setzero_ps();  			//sets sum to zero
+	for(i=0; i<len; i+=4) {
+		num1 = _mm_loadu_ps(a+i);   	//loads unaligned array a into num1  
+										// num1= a[3]  a[2]  a[1]  a[0]
+		num2 = _mm_loadu_ps(b+i);   	//loads unaligned array b into num2 
+										// num2= b[3]   b[2]   b[1]  b[0]
+		num3 = _mm_mul_ps(num1, num2); 	//performs multiplication   
+										// num3 = a[3]*b[3]  a[2]*b[2]  a[1]*b[1]  a[0]*b[0]
+		num3 = _mm_hadd_ps(num3, num3); //performs horizontal addition
+										//num3 =  a[3]*b[3]+ a[2]*b[2]  a[1]*b[1]+a[0]*b[0]  a[3]*b[3]+ a[2]*b[2]  a[1]*b[1]+a[0]*b[0]
+		num4 = _mm_add_ps(num4, num3);  //performs vertical addition
 	}
-#else
-	#error DOT_PROD_SPEED_INVALID
-#endif
+	num4= _mm_hadd_ps(num4, num4);
+	_mm_store_ss(&total,num4);
+	return total;
+}
 
 template <typename T>
 void gram_schmidt (const Matrix<T>& matrix, Matrix<T>& base) {
@@ -256,17 +252,18 @@ void store_vector (std::vector<T>& atom, std::vector<T> params,
 		dict.parameters.push_back (params);
 }
 template <typename T>
-void check_file (const std::string& name, WavInFile& in, const Parameters<T>& p) {
-		if (in.getNumChannels () != 1) {
-			std::stringstream msg;
-			msg << "cannot use " << name.c_str ()  << " (only mono files supported)";
-			std::runtime_error (msg.str ());
-		}
-		if (in.getSampleRate () != p.SR) {
-			std::stringstream msg;
-			msg << "invalid SR for " << name;
-			std::runtime_error (msg.str ());				
-		}
+bool check_file (const std::string& name, WavInFile& in, const Parameters<T>& p) {
+	if (in.getNumChannels () != 1) {
+		std::stringstream msg;
+		std::cerr << "cannot use " << name.c_str ()  << " (only mono files supported)" << std::endl;
+		return false;
+	}
+	if (in.getSampleRate () != p.SR) {
+		std::stringstream msg;
+		std::cerr << "invalid SR for " << name << std::endl;
+		return false;
+	}
+	return true;
 }
 
 template <typename T>
@@ -282,7 +279,7 @@ void make_dictionary (const Parameters<T>& p, Dictionary<T>& dict) {
 			if (files.at (i).find (".wav") != files.at (i).size () - 4) continue; // check WAV extension
 			std::string name = p.dictionary_path + "//" + files.at (i);
 			WavInFile in (name.c_str ());
-			check_file (name, in, p);
+			if (!check_file (name, in, p)) continue;
 			while (!in.eof ()) {
 				memset (&buff[0], 0, sizeof (T) * N);
 				in.read (&buff[0], N);
@@ -297,12 +294,12 @@ void make_dictionary (const Parameters<T>& p, Dictionary<T>& dict) {
 			if (files.at (i).find (".wav") != files.at (i).size () - 4) continue; // check WAV extension
 			std::string name = p.dictionary_path + "//" + files.at (i);
 			WavInFile in (name.c_str ());
-			check_file (name, in, p);
+			if (!check_file (name, in, p)) continue;
 			long nsamp = in.getNumSamples ();
 			std::vector<T> data (nsamp);
 			in.read (&data[0], nsamp);
 			std::vector<T> onsets;
-			get_onsets (&data[0], nsamp, N, N / p.overlap, p.SR, p.onset_threshold, p.onset_timegate, onsets);
+			get_onsets (&data[0], nsamp, N, N / p.overlap, p.SR, p.db_onset_threshold, p.db_onset_timegate, onsets);
 			for (unsigned i = 0; i < onsets.size (); ++i) {
 				int start =  (int) (onsets[i] * p.SR);
 				int len = (int) (i == onsets.size () - 1 ? nsamp - start
@@ -361,7 +358,7 @@ void make_dictionary (const Parameters<T>& p, Dictionary<T>& dict) {
 }
 template <typename T>
 void decompose_frame (T sr, int components, const Dictionary<T>& dictionary,
-	const std::vector<T>& target, DynamicMatrix<T>& frame, int time_pos) {
+	const std::vector<T>& target, DynamicMatrix<T>& frame, int time_pos, dot_function dot) {
 	std::vector<T> residual (target.size (), 0);
 	for (unsigned i = 0; i < target.size (); ++i) {
 		residual[i] = target[i];
@@ -378,7 +375,7 @@ void decompose_frame (T sr, int components, const Dictionary<T>& dictionary,
 			n = n > target.size () ? target.size () : n;
 			int u = dictionary.parameters[k][2];
 			const T* proj = &dictionary.atoms[k][u];
-			T d = (dot_prod (input + u, proj, n));
+			T d = (dot (input + u, proj, n));
 			T mod = fabs (d);
 
 			if (mod > max_modulus) {
@@ -413,6 +410,9 @@ void decompose_frame (T sr, int components, const Dictionary<T>& dictionary,
 template <typename T>
 void pursuit_decomposition (const Parameters<T>& p, const Dictionary<T>& dictionary, 
 	const std::vector<T>& target, Decomposition<T>& decomposition, std::ostream& out) {
+	if (dictionary.atoms.size () == 0) {
+		throw std::runtime_error ("no atoms found in dictionary");
+	}
 	int ptr = 0;
 	int N = pow (2., p.J);
 	int hop = (int) ((T) (N / p.overlap) * p.stretch);	
@@ -420,8 +420,12 @@ void pursuit_decomposition (const Parameters<T>& p, const Dictionary<T>& diction
 	int r = target.size ();
 	std::vector<T> onsets;	
 	if (p.dictionary_type == "onsets") {
-		get_onsets (&target[0], r, N, N / p.overlap, p.SR, p.onset_threshold, p.onset_timegate, onsets);
+		get_onsets (&target[0], r, N, N / p.overlap, p.SR, p.target_onset_threshold, p.target_onset_timegate, onsets);
+		if (onsets.size () == 0) {
+			throw std::runtime_error ("no onsets found in target sound");
+		}
 	}
+
 	int ocntr = 0;
 	while (ptr < r) {
 		DynamicMatrix<T> frame;
@@ -439,7 +443,7 @@ void pursuit_decomposition (const Parameters<T>& p, const Dictionary<T>& diction
 				if (i + len >= r) buffer[i] = 0;
 				buffer[i] = target[i + start];
 			}
-			decompose_frame<T>(p.SR, p.comp, dictionary, buffer, frame, ptr);			
+			decompose_frame<T>(p.SR, p.comp, dictionary, buffer, frame, ptr, &dot_prod);			
 			ptr += len;
 			++ocntr;
 			if (ocntr == onsets.size ()) break;
@@ -448,7 +452,7 @@ void pursuit_decomposition (const Parameters<T>& p, const Dictionary<T>& diction
 				if (i + ptr >= r) buffer[i] = 0;
 				else buffer[i] = target[i + ptr];
 			}
-			decompose_frame<T>(p.SR, p.comp, dictionary, buffer, frame, ptr);			
+			decompose_frame<T>(p.SR, p.comp, dictionary, buffer, frame, ptr, &dot_prod_sse);			
 			ptr += hop;
 		}
 		
@@ -499,7 +503,7 @@ void pursuit_reconstruction (const Parameters<T>& p, const Dictionary<T>& dictio
 	if (p.dictionary_type == "onsets" || p.dictionary_type == "frames") {
 		cosine_window<T>(&hann[0], N, .5, .5, 0.);
 	}	
-	int samples = (int) ((T) decomposition.at (decomposition.size () - 1)[0][2]);
+	int samples = (int) ((T) p.stretch * decomposition.at (decomposition.size () - 1)[0][2]);
 	int last_segment_len = (int) ((T) decomposition.at (decomposition.size () - 1)[0][0]);
 	output.resize (samples + last_segment_len, 0);
 	memset (&output[0], 0, sizeof (T) * samples);
@@ -509,7 +513,7 @@ void pursuit_reconstruction (const Parameters<T>& p, const Dictionary<T>& dictio
 		if (p.dictionary_type == "cosine" || p.dictionary_type == "frames") {
 			for (unsigned i = 0; i < N; ++i) buffer[i] *= hann[i];
 		}
-		int ptr =  decomposition[i][0][2]; // time position (all components for each segment start together)
+		int ptr = (int) ((T) decomposition[i][0][2] / p.overlap); // time position (all components for each segment start together)
 		for (int i  = 0; i < sz; ++i) {
 			if (i + ptr >= output.size ()) break;
 			output[i + ptr] += (buffer[i]);

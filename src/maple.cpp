@@ -10,11 +10,11 @@
 
 using namespace std;
 
-#define VERSION 0.1
+#define VERSION 0.2
 
 int main (int argc, char* argv[]) {
-	cout << "[maple, ver. " << VERSION << "]" << endl << endl;
-	cout << "time/frequency decomposition" << endl;
+	cout << "[ma.p.l.e, ver. " << VERSION << "]" << endl << endl;
+	cout << "matching pursuit linaer expansion" << endl;
 	cout << "(C) 2021 www.carminecella.com" << endl << endl;
 	try {
 		if (argc != 4) {
@@ -64,7 +64,7 @@ int main (int argc, char* argv[]) {
 		ofstream decomp_out ("decomposition.txt");
 		for (unsigned i = 0; i < p.comp; ++i) {
 			for (unsigned j = 0; j < decomposition.size (); ++j) {
-				decomp_out << decomposition[j][i][1] << " ";
+				decomp_out << decomposition[j][i][0] << " " << decomposition[j][i][1] << " " << decomposition[j][i][2] << endl;
 			}
 			decomp_out << endl;
 		}

@@ -50,11 +50,12 @@ struct Parameters {
 	void print (std::ostream& out) {
 		out << "dictionary type..... " << dictionary_type;
 		if (dictionary_type == "files" || dictionary_type == "onsets") {
-			out << " (" << dictionary_path << ")";
+			out << " (" << dictionary_path << ") ";
+			if (dictionary_type == "onsets") out << db_onset_threshold << " " << db_onset_timegate; 
 		}
 		out << std::endl;
 		if (dictionary_type == "onsets") {
-		out << "segmentation........ " << onset_threshold << ", " << onset_timegate << std::endl;
+		out << "segmentation........ " << target_onset_threshold << " " << target_onset_timegate << std::endl;
 		}
 		out << "sampling rate....... " << SR << " Hz" << std::endl;
  		out << "lowest frequency.... " << SR / pow (2., J) << " Hz" << std::endl;
@@ -137,9 +138,13 @@ struct Parameters {
 			if (dictionary_type == "onsets") {
 				if (tokens.size () < 4) std::runtime_error ("invalid number of parameters in config file (onsets)");
 				dictionary_path = tokens[2];
-				onset_threshold = atof (tokens[3].c_str ());
-				onset_timegate = atof (tokens[4].c_str ());
+				db_onset_threshold = atof (tokens[3].c_str ());
+				db_onset_timegate = atof (tokens[4].c_str ());
 			}			
+        } else if (tokens[0] == "segmentation") {
+			if (tokens.size () < 3) std::runtime_error ("invalid number of parameters in config file (segmentation)");		
+        	target_onset_threshold = atof (tokens[1].c_str ());
+			target_onset_timegate = atof (tokens[2].c_str ());
         } else if (tokens[0] == "ratio") {
         	ratio = atof (tokens[1].c_str ());
         } else if (tokens[0] == "stretch") {
@@ -151,18 +156,24 @@ struct Parameters {
         }
 	}
 
-	T SR;
-	int J;
-	int minj;
-	int comp;
-	int oct_div;
-	int phi_slices;
-	int overlap;
-	T freq_limit; 
 	std::string dictionary_type;
 	std::string dictionary_path;
-	T onset_threshold;
-	T onset_timegate;
+
+	T SR;
+	int J;
+	T freq_limit; 
+
+	int minj;	
+	int oct_div;
+	int phi_slices;
+	
+	T db_onset_threshold;
+	T db_onset_timegate;
+	T target_onset_threshold;
+	T target_onset_timegate;
+
+	int comp;
+	int overlap;
 
 	T ratio;
 	T stretch;
