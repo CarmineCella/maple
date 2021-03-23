@@ -15,7 +15,7 @@ using namespace std;
 int main (int argc, char* argv[]) {
 	cout << "[maple, ver. " << VERSION << "]" << endl << endl;
 	cout << "time/frequency decomposition" << endl;
-	cout << "(C) 2020 www.carminecella.com" << endl << endl;
+	cout << "(C) 2021 www.carminecella.com" << endl << endl;
 	try {
 		if (argc != 4) {
 			throw runtime_error ("syntax is 'maple params.txt input.wav output.wav");

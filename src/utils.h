@@ -12,6 +12,9 @@
 #include <stdexcept>
 #include <cmath>
 
+#include <sys/types.h>
+#include <dirent.h>
+
 std::string trim (std::string const& source,
 	char const* delims = " \t\r\n") {
 	std::string result (source);
@@ -45,16 +48,25 @@ struct Parameters {
 		stretch = 1.;
 	}
 	void print (std::ostream& out) {
-		out << "dictionary type..... " << dictionary_type << std::endl;
+		out << "dictionary type..... " << dictionary_type;
+		if (dictionary_type == "files" || dictionary_type == "onsets") {
+			out << " (" << dictionary_path << ")";
+		}
+		out << std::endl;
+		if (dictionary_type == "onsets") {
+		out << "segmentation........ " << onset_threshold << ", " << onset_timegate << std::endl;
+		}
 		out << "sampling rate....... " << SR << " Hz" << std::endl;
  		out << "lowest frequency.... " << SR / pow (2., J) << " Hz" << std::endl;
-		if (dictionary_type != "cosine") {
+		if (dictionary_type == "gabor" || dictionary_type == "gammatone") {
 			out << "smallest time....... " << (T) pow (2, minj) / SR * 1000. << " ms" << std::endl;
 			out << "frequency factor.... " << (T) pow (2., 1. / (T) oct_div) 
 				<< " (1/" << oct_div <<  " oct)" << std::endl;
 			out << "phase factor........ " << 2. * M_PI / phi_slices << std::endl;
 		}
-		out << "highest frequency... " << freq_limit << " Hz" << std::endl << std::endl;
+		if (dictionary_type == "gabor" || dictionary_type == "gammatone" || dictionary_type == "cosine") {
+			out << "highest frequency... " << freq_limit << " Hz" << std::endl << std::endl;
+		}
 		out << "components.......... " << comp << std::endl;
 		out << "overlap............. " << overlap << std::endl;
 		out << "pitch shift......... " << ratio << std::endl;
@@ -97,6 +109,7 @@ struct Parameters {
 	}
 
 	void set_parameter (std::deque<std::string>& tokens) {
+		if (tokens.size () < 2) std::runtime_error ("invalid number of parameters in config file");
    		if (tokens[0] == "SR") {
         	SR = atof (tokens[1].c_str ());
         } else if (tokens[0] == "J") {
@@ -117,6 +130,16 @@ struct Parameters {
         	freq_limit = atof (tokens[1].c_str ());
         } else if (tokens[0] == "dictionary") {
 			dictionary_type = tokens[1];
+			if (tokens.size () < 3) std::runtime_error ("invalid number of parameters in config file (frames)");		
+			if (dictionary_type == "frames") {
+				dictionary_path = tokens[2];
+			}
+			if (dictionary_type == "onsets") {
+				if (tokens.size () < 4) std::runtime_error ("invalid number of parameters in config file (onsets)");
+				dictionary_path = tokens[2];
+				onset_threshold = atof (tokens[3].c_str ());
+				onset_timegate = atof (tokens[4].c_str ());
+			}			
         } else if (tokens[0] == "ratio") {
         	ratio = atof (tokens[1].c_str ());
         } else if (tokens[0] == "stretch") {
@@ -137,6 +160,9 @@ struct Parameters {
 	int overlap;
 	T freq_limit; 
 	std::string dictionary_type;
+	std::string dictionary_path;
+	T onset_threshold;
+	T onset_timegate;
 
 	T ratio;
 	T stretch;
@@ -157,6 +183,23 @@ void deinterleave (const T* stereo, T* l, T* r, int n) {
 		l[i] = stereo[2 * i];
 		r[i] = stereo[2 * i + 1];
 	}
+}
+
+// ------------------------------------------------------------------------------
+
+void list_files (const char *path, std::vector<std::string>& files) {
+    struct dirent *dp;
+    DIR *dir = opendir (path);
+    if (!dir) return; 
+
+    while ((dp = readdir (dir)) != NULL) {
+		if (strcmp(dp->d_name, ".") != 0 && strcmp(dp->d_name, "..") != 0) { // skip . and ..
+        	std::string n (dp->d_name);
+			files.push_back (n);
+		}
+    }
+
+    closedir (dir);
 }
 
 

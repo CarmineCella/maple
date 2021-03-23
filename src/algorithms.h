@@ -16,7 +16,8 @@
 #include <stdexcept>
 #include <cmath>
 
-#define DOT_PROD_SPEED 1
+// TODO: use speedy version for non onsets; rename functions using "segments"
+#define DOT_PROD_SPEED 0
 // #define DEBUG_DECOMPOSITION
 
 // types
@@ -182,6 +183,68 @@ int wchoice(T* dist, int n) {
 	return (int) frand<double>(0, n);
 }
 
+// segmentation
+template <typename T>
+void get_onsets (const T* buffer, int samples,
+	int bsize, int hop, T sr, T threshold, T timegate, std::vector<T>& onsets) {
+	T* cdata = new T[bsize * 2];
+	T* spectrum = new T[bsize];
+	T* old_spectrum = new T[bsize];
+	memset (old_spectrum, 0, sizeof (T) * bsize);
+	AbstractFFT<T>* fft = createFFT<T>(bsize);
+
+	T* win = new T[bsize];
+	cosine_window<T>(win, bsize, .5, .5, 0.); // hanning
+
+	std::vector<T> flux;
+	int frames = 0;
+	for (unsigned i = 0; i < samples; i += hop) {
+		memset(cdata, 0, sizeof(T) * bsize * 2);
+
+		int rsize = i + bsize > samples ? samples - i : bsize;
+		for (unsigned j = 0; j < rsize; ++j) {
+			cdata[2 * j] = buffer[i + j] * win[j]; // windowing
+		}
+
+		fft->forward (cdata);
+		for (unsigned j = 0; j < bsize; ++j) {
+			spectrum[j] = sqrt (cdata[j * 2] * cdata[j * 2] +
+				cdata[j * 2 + 1] * cdata[j * 2 + 1]);
+
+		}
+
+		T v = specflux (spectrum, old_spectrum, bsize);
+		flux.push_back (v);
+		++frames;
+	}
+
+	int mpos = 0;
+	T ma = maximum (&flux[0], flux.size(), mpos);
+	scale<T>(&flux[0], &flux[0], flux.size (), 1. / ma);
+	// save_vector("flux.txt", flux);
+
+	std::vector<int> fluxpeaks;
+	locmax(&flux[0], flux.size (), fluxpeaks);
+
+	T prev_onset = 0;
+	for (unsigned i = 0; i < fluxpeaks.size (); ++i) {
+		if (flux[fluxpeaks[i]] > threshold) {
+			T pos = fluxpeaks[i] * hop / sr;
+			T dist = fabs (pos - prev_onset);
+			if (dist > timegate || i == 0) {
+				onsets.push_back(pos);
+				prev_onset = pos;
+			}
+		}
+	}
+
+	delete [] cdata;
+	delete [] spectrum;
+	delete [] old_spectrum;
+	delete [] win;
+	delete fft;
+}
+
 // matching pursuit
 template <typename T>
 void store_vector (std::vector<T>& atom, std::vector<T> params,
@@ -193,11 +256,64 @@ void store_vector (std::vector<T>& atom, std::vector<T> params,
 		dict.parameters.push_back (params);
 }
 template <typename T>
+void check_file (const std::string& name, WavInFile& in, const Parameters<T>& p) {
+		if (in.getNumChannels () != 1) {
+			std::stringstream msg;
+			msg << "cannot use " << name.c_str ()  << " (only mono files supported)";
+			std::runtime_error (msg.str ());
+		}
+		if (in.getSampleRate () != p.SR) {
+			std::stringstream msg;
+			msg << "invalid SR for " << name;
+			std::runtime_error (msg.str ());				
+		}
+}
+
+template <typename T>
 void make_dictionary (const Parameters<T>& p, Dictionary<T>& dict) {
 	int N = pow (2., p.J);
 	std::vector<T> buff (N);
 	std::vector<T> cbuff (2 * N, 0);
-	if (p.dictionary_type == "cosine") {
+	if (p.dictionary_type == "frames") {
+		std::vector<std::string> files;
+		list_files (p.dictionary_path.c_str (), files);
+
+		for (unsigned i = 0; i < files.size (); ++i) {
+			if (files.at (i).find (".wav") != files.at (i).size () - 4) continue; // check WAV extension
+			std::string name = p.dictionary_path + "//" + files.at (i);
+			WavInFile in (name.c_str ());
+			check_file (name, in, p);
+			while (!in.eof ()) {
+				memset (&buff[0], 0, sizeof (T) * N);
+				in.read (&buff[0], N);
+				store_vector(buff, std::vector<T> {0., (T) N, 0.}, dict);
+			}
+		}
+	} else if (p.dictionary_type == "onsets") {
+		std::vector<std::string> files;
+		list_files (p.dictionary_path.c_str (), files);
+
+		for (unsigned i = 0; i < files.size (); ++i) {
+			if (files.at (i).find (".wav") != files.at (i).size () - 4) continue; // check WAV extension
+			std::string name = p.dictionary_path + "//" + files.at (i);
+			WavInFile in (name.c_str ());
+			check_file (name, in, p);
+			long nsamp = in.getNumSamples ();
+			std::vector<T> data (nsamp);
+			in.read (&data[0], nsamp);
+			std::vector<T> onsets;
+			get_onsets (&data[0], nsamp, N, N / p.overlap, p.SR, p.onset_threshold, p.onset_timegate, onsets);
+			for (unsigned i = 0; i < onsets.size (); ++i) {
+				int start =  (int) (onsets[i] * p.SR);
+				int len = (int) (i == onsets.size () - 1 ? nsamp - start
+					: (int) ((onsets[i + 1] - onsets[i]) * p.SR));
+						
+				std::vector<T> o (len);
+				for (unsigned i = 0; i < len; ++i) o[i] = data[i + start];
+				store_vector(o, std::vector<T> {0., (T) len, 0.}, dict);
+			}
+		}
+	} else if (p.dictionary_type == "cosine") {
 		T f0 = p.SR / (T) N;
 		T fn = f0;
 		while (fn < p.freq_limit) {
@@ -245,7 +361,7 @@ void make_dictionary (const Parameters<T>& p, Dictionary<T>& dict) {
 }
 template <typename T>
 void decompose_frame (T sr, int components, const Dictionary<T>& dictionary,
-	const std::vector<T>& target, DynamicMatrix<T>& frame) {
+	const std::vector<T>& target, DynamicMatrix<T>& frame, int time_pos) {
 	std::vector<T> residual (target.size (), 0);
 	for (unsigned i = 0; i < target.size (); ++i) {
 		residual[i] = target[i];
@@ -259,6 +375,7 @@ void decompose_frame (T sr, int components, const Dictionary<T>& dictionary,
 	for (unsigned i = 0; i < components; ++i) {		
 		for (unsigned k = 0; k < dictionary.atoms.size (); ++k) {
 			int n = dictionary.parameters[k][1];
+			n = n > target.size () ? target.size () : n;
 			int u = dictionary.parameters[k][2];
 			const T* proj = &dictionary.atoms[k][u];
 			T d = (dot_prod (input + u, proj, n));
@@ -271,11 +388,12 @@ void decompose_frame (T sr, int components, const Dictionary<T>& dictionary,
 			}
 		}
 		int n = dictionary.parameters[max_index][1];
+		n = n > target.size () ? target.size () : n;
 		int u = dictionary.parameters[max_index][2];
 		for (unsigned k = 0; k < n; ++k) {
 			residual[k + u] -= (dictionary.atoms[max_index][k + u] * max_prod);
 		}
-		frame.push_back (std::vector<T> {(T) max_index, max_prod});
+		frame.push_back (std::vector<T> {(T) max_index, max_prod, (T) time_pos});
 
 #ifdef DEBUG_DECOMPOSITION
 		int sz = residual.size ();
@@ -287,7 +405,6 @@ void decompose_frame (T sr, int components, const Dictionary<T>& dictionary,
 		WavOutFile ooo (name.str ().c_str (), 44100, 16, 2);
 		ooo.write (&outv[0], sz * 2);
 #endif
-		// std::cout << max_index << " " << max_prod << std::endl;
 		max_modulus = 0;
 	}
 	++fnum;
@@ -301,74 +418,102 @@ void pursuit_decomposition (const Parameters<T>& p, const Dictionary<T>& diction
 	int hop = (int) ((T) (N / p.overlap) * p.stretch);	
 	std::vector<T> buffer (N);
 	int r = target.size ();
+	std::vector<T> onsets;	
+	if (p.dictionary_type == "onsets") {
+		get_onsets (&target[0], r, N, N / p.overlap, p.SR, p.onset_threshold, p.onset_timegate, onsets);
+	}
+	int ocntr = 0;
 	while (ptr < r) {
+		DynamicMatrix<T> frame;
 		int perc = (int) ((T) ptr / r * 100.); 
 		if (perc % 10 == 0) {
 			out << "analysing........... " << perc << "%\r"; out.flush ();
 		}		
-		for (int i  = 0; i < N; ++i) {
-			if (i + ptr >= r) buffer[i] = 0;
-			else buffer[i] = target[i + ptr];
+		if (p.dictionary_type == "onsets") {
+			int start =  (int) (onsets[ocntr] * p.SR);
+			int len = (int) (ocntr == onsets.size () - 1 ? r - start
+				: (int) ((onsets[ocntr + 1] - onsets[ocntr]) * p.SR));
+					
+			buffer.resize (len, 0);
+			for (unsigned i = 0; i < len; ++i) {
+				if (i + len >= r) buffer[i] = 0;
+				buffer[i] = target[i + start];
+			}
+			decompose_frame<T>(p.SR, p.comp, dictionary, buffer, frame, ptr);			
+			ptr += len;
+			++ocntr;
+			if (ocntr == onsets.size ()) break;
+		} else {
+			for (int i  = 0; i < N; ++i) {
+				if (i + ptr >= r) buffer[i] = 0;
+				else buffer[i] = target[i + ptr];
+			}
+			decompose_frame<T>(p.SR, p.comp, dictionary, buffer, frame, ptr);			
+			ptr += hop;
 		}
-		DynamicMatrix<T> frame;
-		decompose_frame<T>(p.SR, p.comp, dictionary, buffer, frame);
-		ptr += hop;
+		
 		decomposition.push_back(frame);
 	}
 }
 
 template <typename T>
-void reconstruct_frame (T ratio, const Dictionary<T>& dictionary, 
+int reconstruct_frame (T ratio, const Dictionary<T>& dictionary, 
 	const DynamicMatrix<T>& decomposition, std::vector<T>& output) {
-	int sz = dictionary.atoms[0].size ();
-	output.resize (sz);
-	memset (&output[0], 0, sizeof (T) * output.size ());
-	std::vector<T> buff;
-	std::vector<T> window (sz);
+	
+	int sz = 0;
 	for (unsigned i = 0; i < decomposition.size (); ++i) {
-		int p = decomposition[i][0]; // position
+		int p = decomposition[i][0]; // position in dictionary
 		T w = decomposition[i][1];  // weight
 		T* ptr = (T*) &dictionary.atoms[p][0];
-		if (ratio != 1.) {
-			int nsamp = (int) ((T) sz * ratio);
-			buff.resize (nsamp + 1, 0);
-			T phi = 0;
-			for (unsigned t = 0; t < nsamp; ++t) {
-				int index = (int) phi;
-				T frac = phi - index;
-				int next = index == sz - 1 ? 0 : index + 1;
-				buff[t] = dictionary.atoms[p][index] * (1. - frac) + dictionary.atoms[p][next] * frac;
-				phi += ratio;
-				if (phi >= sz) phi -= sz;
-			}
-			ptr = &buff[0];
-		} 
-
+		sz = dictionary.atoms[p].size ();
+		output.resize (sz);
+		memset (&output[0], 0, sizeof (T) * output.size ());	
+		// TODO: re-enable pitch shift			
+		// if (ratio != 1.) {
+		//  std::vector<T> buff;
+		// 	int nsamp = (int) ((T) sz * ratio);
+		// 	buff.resize (nsamp + 1, 0);
+		// 	T phi = 0;
+		// 	for (unsigned t = 0; t < nsamp; ++t) {
+		// 		int index = (int) phi;
+		// 		T frac = phi - index;
+		// 		int next = index == sz - 1 ? 0 : index + 1;
+		// 		buff[t] = dictionary.atoms[p][index] * (1. - frac) + dictionary.atoms[p][next] * frac;
+		// 		phi += ratio;
+		// 		if (phi >= sz) phi -= sz;
+		// 	}
+		// 	ptr = &buff[0];
+		// } 
 		for (unsigned t = 0; t < sz; ++t) {
-			output[t] +=  w * ptr[t]; // PSI TILDE? DUAL?
+			output[t] +=  w * ptr[t];
 		}
 	}
-	// std::cout << std::endl;
+	return sz;
 }
 
 template <typename T> 
 void pursuit_reconstruction (const Parameters<T>& p, const Dictionary<T>& dictionary, 
 	const Decomposition<T>& decomposition, 	std::vector<T>& output) {
 	int N = pow (2., p.J);
-	int hop = N / p.overlap;	
-	std::vector<T> buffer (N);
 	std::vector<T> hann (N, 1.);
-	if (p.overlap > 1) {
+	if (p.dictionary_type == "onsets" || p.dictionary_type == "frames") {
 		cosine_window<T>(&hann[0], N, .5, .5, 0.);
 	}	
-	int samples = (int) ((T) decomposition.size () * hop);
-	output.resize (samples + N, 0);
+	int samples = (int) ((T) decomposition.at (decomposition.size () - 1)[0][2]);
+	int last_segment_len = (int) ((T) decomposition.at (decomposition.size () - 1)[0][0]);
+	output.resize (samples + last_segment_len, 0);
 	memset (&output[0], 0, sizeof (T) * samples);
-	int ptr = 0;
 	for (unsigned i = 0; i < decomposition.size (); ++i) {
-		reconstruct_frame (p.ratio, dictionary, decomposition[i], buffer);
-		for (int i  = 0; i < N; ++i) output[i + ptr] += (buffer[i] * hann[i] / (T) p.overlap);
-		ptr += hop;
+		std::vector<T> buffer;
+		int sz = reconstruct_frame (p.ratio, dictionary, decomposition[i], buffer);
+		if (p.dictionary_type == "cosine" || p.dictionary_type == "frames") {
+			for (unsigned i = 0; i < N; ++i) buffer[i] *= hann[i];
+		}
+		int ptr =  decomposition[i][0][2]; // time position (all components for each segment start together)
+		for (int i  = 0; i < sz; ++i) {
+			if (i + ptr >= output.size ()) break;
+			output[i + ptr] += (buffer[i]);
+		}
 	}
 }
 
