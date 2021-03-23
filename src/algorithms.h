@@ -271,6 +271,9 @@ void make_dictionary (const Parameters<T>& p, Dictionary<T>& dict) {
 	int N = pow (2., p.J);
 	std::vector<T> buff (N);
 	std::vector<T> cbuff (2 * N, 0);
+	std::vector<T> hann (N, 1.);
+	cosine_window<T>(&hann[0], N, .5, .5, 0.);
+
 	if (p.dictionary_type == "frames") {
 		std::vector<std::string> files;
 		list_files (p.dictionary_path.c_str (), files);
@@ -283,6 +286,7 @@ void make_dictionary (const Parameters<T>& p, Dictionary<T>& dict) {
 			while (!in.eof ()) {
 				memset (&buff[0], 0, sizeof (T) * N);
 				in.read (&buff[0], N);
+				for (unsigned j = 0; j < N; ++j) buff[j] *= hann[j];
 				store_vector(buff, std::vector<T> {0., (T) N, 0.}, dict);
 			}
 		}
@@ -304,22 +308,10 @@ void make_dictionary (const Parameters<T>& p, Dictionary<T>& dict) {
 				int start =  (int) (onsets[i] * p.SR);
 				int len = (int) (i == onsets.size () - 1 ? nsamp - start
 					: (int) ((onsets[i + 1] - onsets[i]) * p.SR));
-						
 				std::vector<T> o (len);
 				for (unsigned i = 0; i < len; ++i) o[i] = data[i + start];
 				store_vector(o, std::vector<T> {0., (T) len, 0.}, dict);
 			}
-		}
-	} else if (p.dictionary_type == "cosine") {
-		T f0 = p.SR / (T) N;
-		T fn = f0;
-		while (fn < p.freq_limit) {
-			for (unsigned t = 0; t < N; ++t) {
-				buff[t] = cos (2. * M_PI * (T) t / (T) p.SR  * (T) fn);
-			}				
-			
-			store_vector(buff, std::vector<T> {fn, (T) N, 0.}, dict);
-			fn += f0;
 		}
 	} else if (p.dictionary_type == "gabor" || p.dictionary_type == "gammatone") {
 		T comma = pow (2., 1. / p.oct_div);
@@ -391,7 +383,6 @@ void decompose_frame (T sr, int components, const Dictionary<T>& dictionary,
 			residual[k + u] -= (dictionary.atoms[max_index][k + u] * max_prod);
 		}
 		frame.push_back (std::vector<T> {(T) max_index, max_prod, (T) time_pos});
-
 #ifdef DEBUG_DECOMPOSITION
 		int sz = residual.size ();
 		std::vector<T> outv (2 * sz);
@@ -415,7 +406,7 @@ void pursuit_decomposition (const Parameters<T>& p, const Dictionary<T>& diction
 	}
 	int ptr = 0;
 	int N = pow (2., p.J);
-	int hop = (int) ((T) (N / p.overlap) * p.stretch);	
+	int hop = (int) ((T) (N / p.overlap));	
 	std::vector<T> buffer (N);
 	int r = target.size ();
 	std::vector<T> onsets;	
@@ -464,14 +455,20 @@ template <typename T>
 int reconstruct_frame (T ratio, const Dictionary<T>& dictionary, 
 	const DynamicMatrix<T>& decomposition, std::vector<T>& output) {
 	
-	int sz = 0;
+	int max_sz = 0;
+	for (unsigned i = 0; i < decomposition.size (); ++i) {
+		int p = decomposition[i][0]; // position in dictionary
+		if (max_sz < dictionary.atoms[p].size ()) max_sz = dictionary.atoms[p].size ();
+	}
+	output.resize (max_sz);
+	memset (&output[0], 0, sizeof (T) * output.size ());	
+
 	for (unsigned i = 0; i < decomposition.size (); ++i) {
 		int p = decomposition[i][0]; // position in dictionary
 		T w = decomposition[i][1];  // weight
 		T* ptr = (T*) &dictionary.atoms[p][0];
-		sz = dictionary.atoms[p].size ();
-		output.resize (sz);
-		memset (&output[0], 0, sizeof (T) * output.size ());	
+		int sz = dictionary.atoms[p].size ();
+	
 		// TODO: re-enable pitch shift			
 		// if (ratio != 1.) {
 		//  std::vector<T> buff;
@@ -492,17 +489,13 @@ int reconstruct_frame (T ratio, const Dictionary<T>& dictionary,
 			output[t] +=  w * ptr[t];
 		}
 	}
-	return sz;
+	return max_sz;
 }
 
 template <typename T> 
 void pursuit_reconstruction (const Parameters<T>& p, const Dictionary<T>& dictionary, 
 	const Decomposition<T>& decomposition, 	std::vector<T>& output) {
-	int N = pow (2., p.J);
-	std::vector<T> hann (N, 1.);
-	if (p.dictionary_type == "onsets" || p.dictionary_type == "frames") {
-		cosine_window<T>(&hann[0], N, .5, .5, 0.);
-	}	
+
 	int samples = (int) ((T) p.stretch * decomposition.at (decomposition.size () - 1)[0][2]);
 	int last_segment_len = (int) ((T) decomposition.at (decomposition.size () - 1)[0][0]);
 	output.resize (samples + last_segment_len, 0);
@@ -510,13 +503,10 @@ void pursuit_reconstruction (const Parameters<T>& p, const Dictionary<T>& dictio
 	for (unsigned i = 0; i < decomposition.size (); ++i) {
 		std::vector<T> buffer;
 		int sz = reconstruct_frame (p.ratio, dictionary, decomposition[i], buffer);
-		if (p.dictionary_type == "cosine" || p.dictionary_type == "frames") {
-			for (unsigned i = 0; i < N; ++i) buffer[i] *= hann[i];
-		}
-		int ptr = (int) ((T) decomposition[i][0][2] / p.overlap); // time position (all components for each segment start together)
+		int ptr = (int) ((T) decomposition[i][0][2] * p.stretch); // time position (all components for each segment start together)
 		for (int i  = 0; i < sz; ++i) {
 			if (i + ptr >= output.size ()) break;
-			output[i + ptr] += (buffer[i]);
+			output[i + ptr] += (buffer[i] / p.overlap);
 		}
 	}
 }

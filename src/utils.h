@@ -49,7 +49,7 @@ struct Parameters {
 	}
 	void print (std::ostream& out) {
 		out << "dictionary type..... " << dictionary_type;
-		if (dictionary_type == "files" || dictionary_type == "onsets") {
+		if (dictionary_type == "frames" || dictionary_type == "onsets") {
 			out << " (" << dictionary_path << ") ";
 			if (dictionary_type == "onsets") out << db_onset_threshold << " " << db_onset_timegate; 
 		}
@@ -65,7 +65,7 @@ struct Parameters {
 				<< " (1/" << oct_div <<  " oct)" << std::endl;
 			out << "phase factor........ " << 2. * M_PI / phi_slices << std::endl;
 		}
-		if (dictionary_type == "gabor" || dictionary_type == "gammatone" || dictionary_type == "cosine") {
+		if (dictionary_type == "gabor" || dictionary_type == "gammatone") {
 			out << "highest frequency... " << freq_limit << " Hz" << std::endl << std::endl;
 		}
 		out << "components.......... " << comp << std::endl;
@@ -110,7 +110,6 @@ struct Parameters {
 	}
 
 	void set_parameter (std::deque<std::string>& tokens) {
-		if (tokens.size () < 2) std::runtime_error ("invalid number of parameters in config file");
    		if (tokens[0] == "SR") {
         	SR = atof (tokens[1].c_str ());
         } else if (tokens[0] == "J") {
