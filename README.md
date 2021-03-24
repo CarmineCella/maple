@@ -5,6 +5,6 @@ Maple is an experimental framework for sound processing based on time/frequency 
 
 For more information, please contact the author at carmine.emanuele.cella@gmail.com
 
-(C) 2020 by Carmine-Emanuele Cella
+(C) 2021 by Carmine-Emanuele Cella
 
 
