@@ -4,7 +4,7 @@
 
 An interesting effect that Maple can do is sound hybridisation. Here you are some examples:
 
-- [Original sound (Vox)](samples/Vox.wav)
+- [Original sound (Vox)](samples/Vox_full.wav)
 - [Vox and clarinet](generation/Vox_clarinet.wav)
 - [Vox and door noises](generation/Vox_doors.wav)
 - [Vox and kitchen noises (onsets)](generation/Vox_kitchen_onsets.wav)
