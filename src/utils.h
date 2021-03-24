@@ -108,26 +108,33 @@ struct Parameters {
 	        set_parameter (tokens);
 	    }
 	}
-
 	void set_parameter (std::deque<std::string>& tokens) {
    		if (tokens[0] == "SR") {
         	SR = atof (tokens[1].c_str ());
+			if (SR < 8000) throw std::runtime_error ("invaild SR");
         } else if (tokens[0] == "J") {
         	J = atol (tokens[1].c_str ());
+			if (J < 5) throw std::runtime_error ("invaild J");
         } else if (tokens[0] == "minj") {
         	minj = atol (tokens[1].c_str ());
+			if (minj < 1 || minj > J) throw std::runtime_error ("invaild minj");
         } else if (tokens[0] == "components") {
         	comp = atol (tokens[1].c_str ());
+			if (comp < 1) throw std::runtime_error ("invaild number of components");
         } else if (tokens[0] == "oct_divisions") {
         	oct_div = atol (tokens[1].c_str ());
+			if (oct_div < 1) throw std::runtime_error ("invaild octave divisions");
         } 
         else if (tokens[0] == "phi_slices") {
         	phi_slices = atol (tokens[1].c_str ());
+			if (phi_slices < 1) throw std::runtime_error ("invaild phase slices");
         } 
         else if (tokens[0] == "overlap") {
         	overlap = atol (tokens[1].c_str ());
+			if (overlap < 1) throw std::runtime_error ("invaild overlap");
         } else if (tokens[0] == "freq_limit") {
         	freq_limit = atof (tokens[1].c_str ());
+			if (freq_limit < 1 || freq_limit > SR / 2) throw std::runtime_error ("invaild frequency limit");
         } else if (tokens[0] == "dictionary") {
 			dictionary_type = tokens[1];
 			if (tokens.size () < 3) std::runtime_error ("invalid number of parameters in config file (frames)");		
@@ -139,15 +146,19 @@ struct Parameters {
 				dictionary_path = tokens[2];
 				db_onset_threshold = atof (tokens[3].c_str ());
 				db_onset_timegate = atof (tokens[4].c_str ());
+				if (db_onset_threshold < 0 || db_onset_timegate < 0) throw std::runtime_error ("invaild db onset parameters");
 			}			
         } else if (tokens[0] == "segmentation") {
 			if (tokens.size () < 3) std::runtime_error ("invalid number of parameters in config file (segmentation)");		
         	target_onset_threshold = atof (tokens[1].c_str ());
 			target_onset_timegate = atof (tokens[2].c_str ());
+			if (target_onset_threshold < 0 || target_onset_timegate < 0) throw std::runtime_error ("invaild target onset parameters");
         } else if (tokens[0] == "ratio") {
         	ratio = atof (tokens[1].c_str ());
+			if (ratio <= 0) throw std::runtime_error ("invaild ratio");
         } else if (tokens[0] == "stretch") {
         	stretch = atof (tokens[1].c_str ());
+			if (stretch <= 0) throw std::runtime_error ("invaild stretch");
         } else {
             std::stringstream err;
             err << "invalid parameter " << tokens[0];

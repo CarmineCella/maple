@@ -21,7 +21,6 @@ dictionary      gabor
 SR 				44100
 J 				12
 
-
 ; these are the threshold (0-1) and timegate (sec.) parameters for the the segmetnation of the target
 ; (used only if dictionary is 'onsets')
 segmentation    .01 .01
@@ -39,8 +38,8 @@ freq_limit 		17000
 ; use 40-120 components for dictionaries 'gabor' and 'gammatone'
 ; use 1-6 components for dictionaries 'frames' and 'onsets'
 ; use 4-8 overlap factor
-components 		20
-overlap 		8
+components 		10
+overlap 		4
 
 ; pitch shift and time stretch
 ratio			1
