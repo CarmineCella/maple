@@ -14,9 +14,12 @@ An interesting effect that Maple can do is sound hybridisation. Here you are som
 
 To compile, from root folder type:
 
-`mkdir build`
+`mkdir build` 
+
 `cd build`
+
 `cmake ..`
+
 `make`
 
 For more information, please contact the author at carmine.emanuele.cella@gmail.com
