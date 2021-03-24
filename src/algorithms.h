@@ -17,6 +17,7 @@
 #include <cmath>
 
 // #define DEBUG_DECOMPOSITION
+#define ONSET_FADE_MS 10
 
 // types
 template <typename T>
@@ -310,6 +311,22 @@ void make_dictionary (const Parameters<T>& p, Dictionary<T>& dict) {
 					: (int) ((onsets[i + 1] - onsets[i]) * p.SR));
 				std::vector<T> o (len);
 				for (unsigned i = 0; i < len; ++i) o[i] = data[i + start];
+				int fade_samps = (int) ((T) ONSET_FADE_MS / 1000.  * p.SR);
+				if (len < 2 * fade_samps) { // onset too short
+					 continue;
+				}
+				T env = 0.;
+
+				T incr = 1. / fade_samps;
+				for (int h = 0; h < fade_samps; ++h) { // fade in
+					o[h] *= env;
+					env += incr;
+				}
+				for (int h = len - fade_samps; h < len; ++h) { // fade out
+					o[h] *= env;
+					env -= incr;
+				}
+
 				store_vector(o, std::vector<T> {0., (T) len, 0.}, dict);
 			}
 		}

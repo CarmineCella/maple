@@ -14,7 +14,7 @@ using namespace std;
 
 int main (int argc, char* argv[]) {
 	cout << "[ma.p.l.e, ver. " << VERSION << "]" << endl << endl;
-	cout << "matching pursuit linaer expansion" << endl;
+	cout << "matching pursuit linear expansion" << endl;
 	cout << "(C) 2021 www.carminecella.com" << endl << endl;
 	try {
 		if (argc != 4) {

@@ -7,13 +7,13 @@
 ; for onsets you need to specify also the threshold (0-1) and the timegate (sec.) for the segmentation
 ;dictionary 		onsets ../../dict .4 .01
 ;dictionary          frames ../../dict
-;dictionary 		onsets ../../dict2 .2 .01
+;dictionary 		onsets ../../dict2 .1 .01
 ;dictionary 		frames ../../dict2
 ;dictionary          frames /Users/Carmine/Projects/Media/Datasets/TinySOL/Winds/ClBb
 ;dictionary          frames /Users/Carmine/Projects/Media/Datasets/TinySOL/Brass/Hn
-;dictionary          onsets /Users/Carmine/Projects/Media/Sounds/Samples/instruments .1 .01
+dictionary          onsets /Users/Carmine/Projects/Media/Sounds/Samples/instruments .2 .1
 ;dictionary          frames /Users/Carmine/Projects/Media/Sounds/Samples/instruments
-dictionary      gabor
+;dictionary      gabor
 ;dictionary      gammatone
 
 ; these parameters are used by all the dictionary types
@@ -23,7 +23,7 @@ J 				12
 
 ; these are the threshold (0-1) and timegate (sec.) parameters for the the segmetnation of the target
 ; (used only if dictionary is 'onsets')
-segmentation    .01 .01
+segmentation    .1 .1
 
 ; these parameters are used only for gabor and gammatone dictionaries
 ; minj is the smallest timescale supported (2^minj), suggested 8-10
