@@ -166,11 +166,11 @@ void gram_schmidt (const Matrix<T>& matrix, Matrix<T>& base) {
 
 // others
 template <typename T>
-T frand(T min, T max) {
+T frand (T min, T max) {
 	return ((max - min) * ((T)rand() / RAND_MAX) + min);
 }
 template <typename T>
-int wchoice(T* dist, int n) {
+int wchoice (T* dist, int n) {
 	T R = frand<T>(0., 1.);
 	for (int i = 0; i < n; ++i) {
 		if (dist[i] >= R) {
@@ -366,7 +366,7 @@ void make_dictionary (const Parameters<T>& p, Dictionary<T>& dict) {
 	}
 }
 template <typename T>
-void decompose_frame (T sr, int components, const Dictionary<T>& dictionary,
+void decompose_segment (T sr, int components, const Dictionary<T>& dictionary,
 	const std::vector<T>& target, DynamicMatrix<T>& frame, int time_pos, dot_function dot) {
 	std::vector<T> residual (target.size (), 0);
 	for (unsigned i = 0; i < target.size (); ++i) {
@@ -451,7 +451,7 @@ void pursuit_decomposition (const Parameters<T>& p, const Dictionary<T>& diction
 				if (i + len >= r) buffer[i] = 0;
 				buffer[i] = target[i + start];
 			}
-			decompose_frame<T>(p.SR, p.comp, dictionary, buffer, frame, ptr, &dot_prod);			
+			decompose_segment<T>(p.SR, p.comp, dictionary, buffer, frame, ptr, &dot_prod);			
 			ptr += len;
 			++ocntr;
 			if (ocntr == onsets.size ()) break;
@@ -460,7 +460,7 @@ void pursuit_decomposition (const Parameters<T>& p, const Dictionary<T>& diction
 				if (i + ptr >= r) buffer[i] = 0;
 				else buffer[i] = target[i + ptr];
 			}
-			decompose_frame<T>(p.SR, p.comp, dictionary, buffer, frame, ptr, &dot_prod_sse);			
+			decompose_segment<T>(p.SR, p.comp, dictionary, buffer, frame, ptr, &dot_prod_sse);			
 			ptr += hop;
 		}
 		
@@ -469,7 +469,7 @@ void pursuit_decomposition (const Parameters<T>& p, const Dictionary<T>& diction
 }
 
 template <typename T>
-int reconstruct_frame (T ratio, const Dictionary<T>& dictionary, 
+int reconstruct_segment (T ratio, const Dictionary<T>& dictionary, 
 	const DynamicMatrix<T>& decomposition, std::vector<T>& output) {
 	
 	int max_sz = 0;
@@ -522,7 +522,7 @@ void pursuit_reconstruction (const Parameters<T>& p, const Dictionary<T>& dictio
 	memset (&output[0], 0, sizeof (T) * samples);
 	for (unsigned i = 0; i < decomposition.size (); ++i) {
 		std::vector<T> buffer;
-		int sz = reconstruct_frame (p.ratio, dictionary, decomposition[i], buffer);
+		int sz = reconstruct_segment (p.ratio, dictionary, decomposition[i], buffer);
 		int ptr = (int) ((T) decomposition[i][0][2] * p.stretch); // time position (all components for each segment start together)
 		for (int i  = 0; i < sz; ++i) {
 			if (i + ptr >= output.size ()) break;
