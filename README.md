@@ -10,6 +10,7 @@ An interesting effect that Maple can do is sound hybridisation. Here you are som
 - [Vox and kitchen noises (onsets)](generation/Vox_kitchen_onsets.wav)
 - [Vox and orchestra (onsets)](generation/Vox_orchestra_onsets.wav)
 - [Vox and various instruments (onsets)](generation/Vox_various_instr_onsets.wav)
+- [Vox and animals (onsets)](generation/Vox_animals_onsets.wav)
 
 
 To compile, from root folder type:
