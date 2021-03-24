@@ -11,6 +11,8 @@
 #include <sstream>
 #include <stdexcept>
 #include <cmath>
+#include <cstring>
+
 
 #include <sys/types.h>
 #include <dirent.h>

@@ -5,12 +5,13 @@
 ; set dictionary type [gabor, gammatone, frames, onsets]
 ; for onsets and frames you need to specify the folder containing the samples (only mono files 16 bit)
 ; for onsets you need to specify also the threshold (0-1) and the timegate (sec.) for the segmentation
-;dictionary 		onsets ../../dict .4 .01
+;dictionary 		onsets ../../dict .1 .1
+dictionary 		frames ../../dict
 ;dictionary          onsets ../../dict/Kitchen .2 .1
 ;dictionary 		onsets ../../dict/orchestra .2 .1
 ;dictionary 			frames ../../dict/orchestra
 ;dictionary 			onsets ../../dict/People .1 .1
-dictionary 			onsets ../../dict/Animals .4 .01
+;dictionary 			onsets ../../dict/Animals .4 .01
 ;dictionary          frames /Users/Carmine/Projects/Media/Datasets/TinySOL/Winds/ClBb
 ;dictionary          frames /Users/Carmine/Projects/Media/Datasets/TinySOL/Brass/Hn
 ;dictionary          onsets /Users/Carmine/Projects/Media/Sounds/Samples/instruments .2 .01

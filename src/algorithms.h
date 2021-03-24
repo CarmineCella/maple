@@ -116,6 +116,7 @@ T dot_prod (const T* a, const T* b, int size) {
 	else return sum;
 }
 
+#ifdef USE_FAST_DOTPROD
 #include <pmmintrin.h>
 float dot_prod_sse (const float *a, const float *b, int len) {
 	float total;
@@ -137,6 +138,10 @@ float dot_prod_sse (const float *a, const float *b, int len) {
 	_mm_store_ss(&total,num4);
 	return total;
 }
+#else
+
+#define dot_prod_sse dot_prod
+#endif
 
 template <typename T>
 void gram_schmidt (const Matrix<T>& matrix, Matrix<T>& base) {
