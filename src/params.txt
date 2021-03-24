@@ -5,8 +5,8 @@
 ; set dictionary type [gabor, gammatone, frames, onsets]
 ; for onsets and frames you need to specify the folder containing the samples (only mono files 16 bit)
 ; for onsets you need to specify also the threshold (0-1) and the timegate (sec.) for the segmentation
-;dictionary 		onsets ../../dict .1 .1
-dictionary 		frames ../../dict
+dictionary 		onsets ../../dict .1 .1
+;dictionary 		frames ../../dict
 ;dictionary          onsets ../../dict/Kitchen .2 .1
 ;dictionary 		onsets ../../dict/orchestra .2 .1
 ;dictionary 			frames ../../dict/orchestra
@@ -26,7 +26,7 @@ J 				12
 
 ; these are the threshold (0-1) and timegate (sec.) parameters for the the segmetnation of the target
 ; (used only if dictionary is 'onsets')
-segmentation    .01 .01
+segmentation    .1 .1
 
 ; these parameters are used only for gabor and gammatone dictionaries
 ; minj is the smallest timescale supported (2^minj samples), suggested 8-10

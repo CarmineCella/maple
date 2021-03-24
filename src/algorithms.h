@@ -16,7 +16,15 @@
 #include <stdexcept>
 #include <cmath>
 
-// #define DEBUG_DECOMPOSITION
+// TODO: 
+// - save dictionary and analysis to reuse
+// - add probabilistic generation
+// - implement shift/stretch in frequency domain
+// - improve segmentation 
+
+//#define DEBUG_DECOMPOSITION
+//#define USE_FAST_DOTPROD
+
 #define ONSET_FADE_MS 10
 
 // types
