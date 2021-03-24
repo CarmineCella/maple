@@ -11,6 +11,14 @@ An interesting effect that Maple can do is sound hybridisation. Here you are som
 - [Vox and orchestra (onsets)](generation/Vox_orchestra_onsets.wav)
 - [Vox and various instruments (onsets)](generation/Vox_various_instr_onsets.wav)
 
+
+To compile, from root folder type:
+
+`mkdir build`
+`cd build`
+`cmake ..`
+`make`
+
 For more information, please contact the author at carmine.emanuele.cella@gmail.com
 
 (C) 2021 by Carmine-Emanuele Cella
