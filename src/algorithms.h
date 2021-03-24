@@ -280,7 +280,7 @@ void make_dictionary (const Parameters<T>& p, Dictionary<T>& dict) {
 
 		for (unsigned i = 0; i < files.size (); ++i) {
 			if (files.at (i).find (".wav") != files.at (i).size () - 4) continue; // check WAV extension
-			std::string name = p.dictionary_path + "//" + files.at (i);
+			std::string name = p.dictionary_path + "/" + files.at (i);
 			WavInFile in (name.c_str ());
 			if (!check_file (name, in, p)) continue;
 			while (!in.eof ()) {
@@ -296,7 +296,7 @@ void make_dictionary (const Parameters<T>& p, Dictionary<T>& dict) {
 
 		for (unsigned i = 0; i < files.size (); ++i) {
 			if (files.at (i).find (".wav") != files.at (i).size () - 4) continue; // check WAV extension
-			std::string name = p.dictionary_path + "//" + files.at (i);
+			std::string name = p.dictionary_path + "/" + files.at (i);
 			WavInFile in (name.c_str ());
 			if (!check_file (name, in, p)) continue;
 			long nsamp = in.getNumSamples ();
@@ -460,6 +460,7 @@ int reconstruct_frame (T ratio, const Dictionary<T>& dictionary,
 		int p = decomposition[i][0]; // position in dictionary
 		if (max_sz < dictionary.atoms[p].size ()) max_sz = dictionary.atoms[p].size ();
 	}
+	max_sz /= ratio;
 	output.resize (max_sz);
 	memset (&output[0], 0, sizeof (T) * output.size ());	
 
@@ -469,22 +470,24 @@ int reconstruct_frame (T ratio, const Dictionary<T>& dictionary,
 		T* ptr = (T*) &dictionary.atoms[p][0];
 		int sz = dictionary.atoms[p].size ();
 	
-		// TODO: re-enable pitch shift			
-		// if (ratio != 1.) {
-		//  std::vector<T> buff;
-		// 	int nsamp = (int) ((T) sz * ratio);
-		// 	buff.resize (nsamp + 1, 0);
-		// 	T phi = 0;
-		// 	for (unsigned t = 0; t < nsamp; ++t) {
-		// 		int index = (int) phi;
-		// 		T frac = phi - index;
-		// 		int next = index == sz - 1 ? 0 : index + 1;
-		// 		buff[t] = dictionary.atoms[p][index] * (1. - frac) + dictionary.atoms[p][next] * frac;
-		// 		phi += ratio;
-		// 		if (phi >= sz) phi -= sz;
-		// 	}
-		// 	ptr = &buff[0];
-		// } 
+		std::vector<T> buff;
+		if (ratio != 1.) {
+			int nsamp = (int) ((T) sz / ratio);
+			buff.resize (nsamp);
+			memset (&buff[0], 0, sizeof (T) * buff.size ());				
+			T phi = 0;
+			for (unsigned t = 0; t < nsamp; ++t) {
+				int index = (int) phi;
+				T frac = phi - index;
+				int next = index + 1;
+				if (next >= sz) break;
+				buff[t] = dictionary.atoms[p][index] * (1. - frac) + dictionary.atoms[p][next] * frac;	
+				phi += ratio;
+				if (phi >= sz) break;
+			}
+			ptr = &buff[0];
+			sz = nsamp;
+		} 
 		for (unsigned t = 0; t < sz; ++t) {
 			output[t] +=  w * ptr[t];
 		}
