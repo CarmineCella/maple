@@ -14,6 +14,8 @@
 #include <sstream>
 #include <iomanip>
 #include <stdexcept>
+#include <map>
+#include <deque>
 #include <cmath>
 
 // TODO: 
@@ -554,6 +556,49 @@ void export_decomposition_channel (T SR, int channel, const Dictionary<T>& dicti
 		int p = decompositions[i][channel][0]; // position
 		std::vector<T> t (dictionary.atoms[p]);
 		chout.write(&t[0], t.size ());
+	}
+}
+
+// ------------------------------------------------------------------
+typedef std::deque<int> Prefix;
+typedef std::map<Prefix, std::vector<int> > StateTab;
+
+// add: add word to suffix deque, update prefix void add(Prefix& prefix, const string& s)
+void add(Prefix& prefix, char s, int npref, StateTab& tab) {
+	if (prefix.size() == npref) { 
+		tab[prefix].push_back(s);
+		prefix.pop_front();
+	}
+	prefix.push_back(s);
+}
+
+// build: read input words, build state table void build(Prefix& prefix, istream& in)
+template <typename T>
+void build (Prefix& prefix, Decomposition<T>& decomposition, int npref, int channel, StateTab& tab) {
+
+	for (unsigned i = 0; i < decomposition.size (); ++i) {
+		DynamicMatrix<float>& m = decomposition.at (i);
+		if (channel < 0 || channel > m.size ()) {
+			throw std::runtime_error ("invalid channel requested in generation");
+		}
+		for (unsigned t = 0; t < m.at (channel).size (); ++t) {
+			int w = (int) m.at (channel).at (t);
+			add (prefix, w, npref, tab);
+		}
+	}	
+}
+
+// generate: produce output, one word per line void generate(int nwords)
+void generate(Prefix& current, StateTab& tab, int nwords, int* out) {
+	for (int i = 0; i < nwords; i++) {
+		int pw = 0;
+		std::vector<int>& suf = tab[current]; 
+		if (suf.size () == 0) continue;
+		int w = suf[rand() % suf.size()]; 
+		pw = w;
+		out[i] = w;
+		current.pop_front();
+		current.push_back(w);
 	}
 }
 

@@ -83,6 +83,18 @@ int main (int argc, char* argv[]) {
 		WavOutFile reconstruction (argv[3], p.SR, 16, 1);
 		reconstruction.write (&rebuild[0], rebuild.size ());
 		cout << " done"<< endl << endl;
+
+		for (int i = 0; i < p.comp; ++i) {
+			export_decomposition_channel(p.SR, i, dictionary, decomposition);
+		}
+
+		StateTab tab;
+		Prefix prefix; // current input prefix
+		cout << "building transitions"; cout.flush();
+		int order = 10;
+		int channel = 0;
+		build (prefix, decomposition, order, channel, tab);
+
 	}
 	catch (exception& e) {
 		cout << "Error: " << e.what () << endl;

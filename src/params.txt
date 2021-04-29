@@ -5,9 +5,9 @@
 ; set dictionary type [gabor, gammatone, frames, onsets]
 ; for onsets and frames you need to specify the folder containing the samples (only mono files 16 bit)
 ; for onsets you need to specify also the threshold (0-1) and the timegate (sec.) for the segmentation
-dictionary 		onsets ../../dict .1 .1
+;dictionary 		onsets ../../dict .1 .1
 ;dictionary 		frames ../../dict
-;dictionary          onsets ../../dict/Kitchen .2 .1
+dictionary          onsets ../../dict/Kitchen .2 .1
 ;dictionary 		onsets ../../dict/orchestra .2 .1
 ;dictionary 			frames ../../dict/orchestra
 ;dictionary 			onsets ../../dict/People .1 .1
@@ -41,7 +41,7 @@ freq_limit 		17000
 ; use 40-120 components for dictionaries 'gabor' and 'gammatone'
 ; use 1-6 components for dictionaries 'frames' and 'onsets'
 ; use 4-8 overlap factor
-components 		8
+components 		4
 overlap 		4
 
 ; pitch shift and time stretch
