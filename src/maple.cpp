@@ -84,9 +84,9 @@ int main (int argc, char* argv[]) {
 		reconstruction.write (&rebuild[0], rebuild.size ());
 		cout << " done"<< endl << endl;
 
-		for (int i = 0; i < p.comp; ++i) {
-			export_decomposition_channel(p.SR, i, dictionary, decomposition);
-		}
+		// for (int i = 0; i < p.comp; ++i) {
+		// 	export_decomposition_channel(p.SR, i, dictionary, decomposition);
+		// }
 
 		// StateTab tab;
 		// Prefix prefix; // current input prefix
