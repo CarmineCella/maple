@@ -88,12 +88,24 @@ int main (int argc, char* argv[]) {
 			export_decomposition_channel(p.SR, i, dictionary, decomposition);
 		}
 
-		StateTab tab;
-		Prefix prefix; // current input prefix
-		cout << "building transitions"; cout.flush();
-		int order = 10;
-		int channel = 0;
-		build (prefix, decomposition, order, channel, tab);
+		// StateTab tab;
+		// Prefix prefix; // current input prefix
+		// cout << "building transitions"; cout.flush();
+		// int order = 2;
+		// int channel = 0;
+		// build_channel_transitions (decomposition, channel, order, prefix, tab);
+
+		// for (map<Prefix, vector<int> >::iterator i = tab.begin (); i != tab.end (); ++i) {
+		// 	cout << "[";
+		// 	for (unsigned l = 0; l < i->first.size (); ++l) {
+		// 		cout << i->first.at (l) << " ";
+		// 	}
+		// 	cout << "] ";
+		// 	for (unsigned j = 0; j < i->second.size (); ++j) {
+		// 		cout << i->second.at (j) << " ";
+		// 	}
+		// 	cout << endl;
+		// }
 
 	}
 	catch (exception& e) {

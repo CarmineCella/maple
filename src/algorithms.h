@@ -250,6 +250,8 @@ void get_onsets (const T* buffer, int samples,
 		}
 	}
 
+	if (onsets.size () == 0) onsets.push_back (0);
+
 	delete [] cdata;
 	delete [] spectrum;
 	delete [] old_spectrum;
@@ -448,7 +450,6 @@ void pursuit_decomposition (const Parameters<T>& p, const Dictionary<T>& diction
 			throw std::runtime_error ("no onsets found in target sound");
 		}
 	}
-
 	int ocntr = 0;
 	while (ptr < r) {
 		DynamicMatrix<T> frame;
@@ -466,10 +467,12 @@ void pursuit_decomposition (const Parameters<T>& p, const Dictionary<T>& diction
 				if (i + len >= r) buffer[i] = 0;
 				buffer[i] = target[i + start];
 			}
+
 			decompose_segment<T>(p.SR, p.comp, dictionary, buffer, frame, ptr, &dot_prod);			
 			ptr += len;
 			++ocntr;
-			if (ocntr == onsets.size ()) break;
+			decomposition.push_back(frame);
+			if (ocntr == onsets.size ()) break; 
 		} else {
 			for (int i  = 0; i < N; ++i) {
 				if (i + ptr >= r) buffer[i] = 0;
@@ -477,9 +480,12 @@ void pursuit_decomposition (const Parameters<T>& p, const Dictionary<T>& diction
 			}
 			decompose_segment<T>(p.SR, p.comp, dictionary, buffer, frame, ptr, &dot_prod_sse);			
 			ptr += hop;
+			decomposition.push_back(frame);
 		}
-		
-		decomposition.push_back(frame);
+	}
+
+	if (decomposition.size () == 0) {
+		throw std::runtime_error ("no elements found in the decomposition");
 	}
 }
 
@@ -502,6 +508,7 @@ int reconstruct_segment (T ratio, const Dictionary<T>& dictionary,
 		T* ptr = (T*) &dictionary.atoms[p][0];
 		int sz = dictionary.atoms[p].size ();
 	
+
 		std::vector<T> buff;
 		if (ratio != 1.) {
 			int nsamp = (int) ((T) sz / ratio);
@@ -530,12 +537,12 @@ int reconstruct_segment (T ratio, const Dictionary<T>& dictionary,
 template <typename T> 
 void pursuit_reconstruction (const Parameters<T>& p, const Dictionary<T>& dictionary, 
 	const Decomposition<T>& decomposition, 	std::vector<T>& output) {
-
 	int samples = (int) ((T) p.stretch * decomposition.at (decomposition.size () - 1)[0][2]);
 	int last_segment_len = (int) ((T) decomposition.at (decomposition.size () - 1)[0][0]);
 	output.resize (samples + last_segment_len, 0);
 	memset (&output[0], 0, sizeof (T) * samples);
 	for (unsigned i = 0; i < decomposition.size (); ++i) {
+		
 		std::vector<T> buffer;
 		int sz = reconstruct_segment (p.ratio, dictionary, decomposition[i], buffer);
 		int ptr = (int) ((T) decomposition[i][0][2] * p.stretch); // time position (all components for each segment start together)
@@ -563,8 +570,8 @@ void export_decomposition_channel (T SR, int channel, const Dictionary<T>& dicti
 typedef std::deque<int> Prefix;
 typedef std::map<Prefix, std::vector<int> > StateTab;
 
-// add: add word to suffix deque, update prefix void add(Prefix& prefix, const string& s)
-void add(Prefix& prefix, char s, int npref, StateTab& tab) {
+// add: add word to suffix deque, update prefix
+void add_state (Prefix& prefix, int s, int npref, StateTab& tab) {
 	if (prefix.size() == npref) { 
 		tab[prefix].push_back(s);
 		prefix.pop_front();
@@ -572,10 +579,10 @@ void add(Prefix& prefix, char s, int npref, StateTab& tab) {
 	prefix.push_back(s);
 }
 
-// build: read input words, build state table void build(Prefix& prefix, istream& in)
+// build: read input words, build state table 
 template <typename T>
-void build (Prefix& prefix, Decomposition<T>& decomposition, int npref, int channel, StateTab& tab) {
-
+void build_channel_transitions (Decomposition<T>& decomposition, int channel, int npref, 
+	Prefix& prefix, StateTab& tab) {
 	for (unsigned i = 0; i < decomposition.size (); ++i) {
 		DynamicMatrix<float>& m = decomposition.at (i);
 		if (channel < 0 || channel > m.size ()) {
@@ -583,22 +590,27 @@ void build (Prefix& prefix, Decomposition<T>& decomposition, int npref, int chan
 		}
 		for (unsigned t = 0; t < m.at (channel).size (); ++t) {
 			int w = (int) m.at (channel).at (t);
-			add (prefix, w, npref, tab);
+			add_state (prefix, w, npref, tab);
 		}
 	}	
 }
 
-// generate: produce output, one word per line void generate(int nwords)
-void generate(Prefix& current, StateTab& tab, int nwords, int* out) {
+// generate: produce output
+template <typename T>
+void generate_channel (Prefix& current, StateTab& tab, int nwords,
+	 Decomposition<T>& generation, int channel, const Dictionary<T>& dict) {
+	int time_pos = 0;
 	for (int i = 0; i < nwords; i++) {
-		int pw = 0;
 		std::vector<int>& suf = tab[current]; 
 		if (suf.size () == 0) continue;
 		int w = suf[rand() % suf.size()]; 
-		pw = w;
-		out[i] = w;
+		int len = dict.parameters.at (w).at (2);
+		DynamicMatrix<T> frame;
+		T max_prod = 1;
+		frame.push_back (std::vector<T> {(T) w, max_prod, (T) time_pos});
 		current.pop_front();
 		current.push_back(w);
+		time_pos += len;
 	}
 }
 
