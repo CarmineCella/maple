@@ -109,3 +109,49 @@ function  x = algo_omp(k, A, y)
     t = support';
     x(t) = xfinal;
 end
+
+
+
+
+
+
+
+
+
+		for (map<Prefix, vector<int> >::iterator i = tab.begin (); i != tab.end (); ++i) {
+			cout << "[";
+			for (unsigned l = 0; l < i->first.size (); ++l) {
+				cout << i->first.at (l) << " ";
+			}
+			cout << "] ";
+			for (unsigned j = 0; j < i->second.size (); ++j) {
+				cout << i->second.at (j) << " ";
+			}
+			cout << endl;
+		}
+
+template <typename T>
+void gram_schmidt (const Matrix<T>& matrix, Matrix<T>& base) {
+	int dim = matrix.cols (); // must be squared
+   	Matrix<T> r (matrix);
+    Matrix<T> v (dim, dim);
+
+    for (int i = 0; i < dim; ++i) {
+        for (int j = 0; j < dim; ++j) {
+            v[i][j] = matrix[i][j];
+        }
+    }
+
+    for (int i = 0; i < dim; ++i) {
+        r[i][i] = norm (&v[i][0], v.size ());
+        for (int j = 0; j < dim; ++j) {
+            base[i][j] = v[i][j] / r[i][i];
+        }
+        for (int k = i + 1;  k < dim; ++k) {
+            r[i][k] = dot_product (&base[i][0], &v[k][0], base[i].size ());
+            for (int j=0; j < dim; ++j) {
+                v[k][j] = v[k][j] - r[i][k] * base[i][j];
+            }
+        }
+    }
+}

@@ -25,7 +25,7 @@
 // - improve segmentation 
 
 //#define DEBUG_DECOMPOSITION
-//#define USE_FAST_DOTPROD
+#define USE_FAST_DOTPROD
 
 #define ONSET_FADE_MS 10
 
@@ -153,32 +153,6 @@ float dot_prod_sse (const float *a, const float *b, int len) {
 #define dot_prod_sse dot_prod
 #endif
 
-template <typename T>
-void gram_schmidt (const Matrix<T>& matrix, Matrix<T>& base) {
-	int dim = matrix.cols (); // must be squared
-   	Matrix<T> r (matrix);
-    Matrix<T> v (dim, dim);
-
-    for (int i = 0; i < dim; ++i) {
-        for (int j = 0; j < dim; ++j) {
-            v[i][j] = matrix[i][j];
-        }
-    }
-
-    for (int i = 0; i < dim; ++i) {
-        r[i][i] = norm (&v[i][0], v.size ());
-        for (int j = 0; j < dim; ++j) {
-            base[i][j] = v[i][j] / r[i][i];
-        }
-        for (int k = i + 1;  k < dim; ++k) {
-            r[i][k] = dot_product (&base[i][0], &v[k][0], base[i].size ());
-            for (int j=0; j < dim; ++j) {
-                v[k][j] = v[k][j] - r[i][k] * base[i][j];
-            }
-        }
-    }
-}
-
 // others
 template <typename T>
 T frand (T min, T max) {
@@ -303,9 +277,11 @@ void make_dictionary (const Parameters<T>& p, Dictionary<T>& dict) {
 			if (!check_file (name, in, p)) continue;
 			while (!in.eof ()) {
 				memset (&buff[0], 0, sizeof (T) * N);
-				in.read (&buff[0], N);
-				for (unsigned j = 0; j < N; ++j) buff[j] *= hann[j];
-				store_vector(buff, std::vector<T> {0., (T) N, 0.}, dict);
+				int r = in.read (&buff[0], N);
+				if (r == N) {
+					for (unsigned j = 0; j < r; ++j) buff[j] *= hann[j];
+					store_vector(buff, std::vector<T> {0., (T) N, 0.}, dict);
+				}
 			}
 		}
 	} else if (p.dictionary_type == "onsets") {
@@ -384,7 +360,7 @@ void make_dictionary (const Parameters<T>& p, Dictionary<T>& dict) {
 }
 template <typename T>
 void decompose_segment (T sr, int components, const Dictionary<T>& dictionary,
-	const std::vector<T>& target, DynamicMatrix<T>& frame, int time_pos, dot_function dot) {
+	const std::vector<T>& target, int time_pos, dot_function dot,  DynamicMatrix<T>& frame) {
 	std::vector<T> residual (target.size (), 0);
 	for (unsigned i = 0; i < target.size (); ++i) {
 		residual[i] = target[i];
@@ -468,7 +444,7 @@ void pursuit_decomposition (const Parameters<T>& p, const Dictionary<T>& diction
 				buffer[i] = target[i + start];
 			}
 
-			decompose_segment<T>(p.SR, p.comp, dictionary, buffer, frame, ptr, &dot_prod);			
+			decompose_segment<T>(p.SR, p.comp, dictionary, buffer, ptr, &dot_prod, frame);			
 			ptr += len;
 			++ocntr;
 			decomposition.push_back(frame);
@@ -478,7 +454,7 @@ void pursuit_decomposition (const Parameters<T>& p, const Dictionary<T>& diction
 				if (i + ptr >= r) buffer[i] = 0;
 				else buffer[i] = target[i + ptr];
 			}
-			decompose_segment<T>(p.SR, p.comp, dictionary, buffer, frame, ptr, &dot_prod_sse);			
+			decompose_segment<T>(p.SR, p.comp, dictionary, buffer, ptr, &dot_prod_sse, frame);			
 			ptr += hop;
 			decomposition.push_back(frame);
 		}
@@ -507,7 +483,6 @@ int reconstruct_segment (T ratio, const Dictionary<T>& dictionary,
 		T w = decomposition[i][1];  // weight
 		T* ptr = (T*) &dictionary.atoms[p][0];
 		int sz = dictionary.atoms[p].size ();
-	
 
 		std::vector<T> buff;
 		if (ratio != 1.) {
@@ -581,39 +556,72 @@ void add_state (Prefix& prefix, int s, int npref, StateTab& tab) {
 
 // build: read input words, build state table 
 template <typename T>
-void build_channel_transitions (Decomposition<T>& decomposition, int channel, int npref, 
+void build_channel_transitions (const Decomposition<T>& decomposition, int channel, int npref, 
 	Prefix& prefix, StateTab& tab) {
 	for (unsigned i = 0; i < decomposition.size (); ++i) {
-		DynamicMatrix<float>& m = decomposition.at (i);
+		const DynamicMatrix<float>& m = decomposition.at (i);
 		if (channel < 0 || channel > m.size ()) {
 			throw std::runtime_error ("invalid channel requested in generation");
 		}
-		for (unsigned t = 0; t < m.at (channel).size (); ++t) {
-			int w = (int) m.at (channel).at (t);
-			add_state (prefix, w, npref, tab);
-		}
+		int w = (int) m.at (channel).at (0); // 0-th is the atom index
+		add_state (prefix, w, npref, tab);
 	}	
+}
+
+template <typename T>
+void build_transitions (const Parameters<T>& p, const Decomposition<T>& decomposition, int npref, 
+	Prefix& prefix, std::vector<StateTab>& tabs) {
+	for (unsigned i = 0; i < p.comp; ++i) {
+		StateTab tab;
+		build_channel_transitions (decomposition, i, npref, prefix, tab);
+		tabs.push_back (tab);
+	}
 }
 
 // generate: produce output
 template <typename T>
-void generate_channel (Prefix& current, StateTab& tab, int nwords,
-	 Decomposition<T>& generation, int channel, const Dictionary<T>& dict) {
+int generate_channel (const Parameters<T>& p,  StateTab& tab, const Dictionary<T>& dict,
+	Prefix& current,int channel, int& time_pos, DynamicMatrix<T>& frame) {
+	std::vector<int>& suf = tab[current]; 
+	while (suf.size () == 0) {
+		StateTab::iterator item = tab.begin();
+		int random_index = rand() % tab.size();
+		std::advance(item, random_index);			
+		suf = item->second;
+		current = item->first;
+	}
+	assert (suf.size () > 0);
+	int rp = rand() % suf.size();
+	int w = suf[rp]; 
+	int len = dict.parameters.at (w).at (1);
+	T max_prod = 1;
+	frame.push_back (std::vector<T> {(T) w, max_prod, (T) time_pos});
+	current.pop_front();
+	current.push_back(w);
+	if (p.dictionary_type != "onsets") {
+		int N = pow (2., p.J);
+		int hop = (int) ((T) N / p.overlap);	
+		return hop;
+	} else return len;	
+}
+template <typename T>
+void probabilistic_generation (const Parameters<T>& p, std::vector<StateTab>& tabs, 
+	const Dictionary<T>& dict, int nwords,
+	Decomposition<T>& generation) {
+	std::vector<Prefix> currents (p.comp);
 	int time_pos = 0;
-	for (int i = 0; i < nwords; i++) {
-		std::vector<int>& suf = tab[current]; 
-		if (suf.size () == 0) continue;
-		int w = suf[rand() % suf.size()]; 
-		int len = dict.parameters.at (w).at (2);
-		DynamicMatrix<T> frame;
-		T max_prod = 1;
-		frame.push_back (std::vector<T> {(T) w, max_prod, (T) time_pos});
-		current.pop_front();
-		current.push_back(w);
-		time_pos += len;
+	
+	for (unsigned j = 0; j < nwords; ++j) {
+		DynamicMatrix<T> frame; // FIXME
+		int max_len = 0;
+		for (unsigned i = 0; i < p.comp; ++i) {	
+			int l = generate_channel (p, tabs.at (i), dict, currents.at (i), i, time_pos, frame);
+			if (l > max_len) max_len = l;
+		}
+		time_pos += max_len;
+		if (frame.size () == p.comp) generation.push_back (frame);	
 	}
 }
-
 
 #endif	// ALGORITHMS_H 
 

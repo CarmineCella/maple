@@ -13,6 +13,7 @@ using namespace std;
 #define VERSION 0.2
 
 int main (int argc, char* argv[]) {
+	srand (time (NULL));
 	cout << "[ma.p.l.e, ver. " << VERSION << "]" << endl << endl;
 	cout << "matching pursuit linear expansion" << endl;
 	cout << "(C) 2021 www.carminecella.com" << endl << endl;
@@ -70,6 +71,12 @@ int main (int argc, char* argv[]) {
 		}
 		cout << "done" << endl;
 
+#ifdef DEBUG_DECOMPOSITION
+		for (int i = 0; i < p.comp; ++i) {
+			export_decomposition_channel(p.SR, i, dictionary, decomposition);
+		}
+#endif
+
 		// synthesis
 		cout << "reconstructing......"; cout.flush ();
 		vector<float> rebuild;
@@ -84,28 +91,35 @@ int main (int argc, char* argv[]) {
 		reconstruction.write (&rebuild[0], rebuild.size ());
 		cout << " done"<< endl << endl;
 
-		// for (int i = 0; i < p.comp; ++i) {
-		// 	export_decomposition_channel(p.SR, i, dictionary, decomposition);
-		// }
+		vector<StateTab> tabs;
+		Prefix prefix; // current input prefix
+		cout << "building transitions"; cout.flush();
+		int order = 10;
+		build_transitions (p, decomposition, order, prefix, tabs);
+		cout << " done"<< endl << endl;
+		
+		cout << "generating decomposition"; cout.flush();
+		int nwords = 200;
+		Decomposition<float> generation;
+		probabilistic_generation (p, tabs, dictionary, nwords, generation);
+		cout << " done"<< endl << endl;
+		
+		vector<float> regen;
+		pursuit_reconstruction (p, dictionary, generation, regen);
 
-		// StateTab tab;
-		// Prefix prefix; // current input prefix
-		// cout << "building transitions"; cout.flush();
-		// int order = 2;
-		// int channel = 0;
-		// build_channel_transitions (decomposition, channel, order, prefix, tab);
+		cout << "gen size " << generation.size () << endl;
+		WavOutFile regeneratio ("gen.wav", p.SR, 16, 1);
+		regeneratio.write (&regen[0], regen.size ());
 
-		// for (map<Prefix, vector<int> >::iterator i = tab.begin (); i != tab.end (); ++i) {
-		// 	cout << "[";
-		// 	for (unsigned l = 0; l < i->first.size (); ++l) {
-		// 		cout << i->first.at (l) << " ";
-		// 	}
-		// 	cout << "] ";
-		// 	for (unsigned j = 0; j < i->second.size (); ++j) {
-		// 		cout << i->second.at (j) << " ";
-		// 	}
-		// 	cout << endl;
-		// }
+
+		ofstream gen_out ("generation.txt");
+		for (unsigned j = 0; j < generation.size (); ++j) {
+			for (unsigned i = 0; i < p.comp; ++i) { // FIXME
+				gen_out << generation[j][i][0] << " " << generation[j][i][1] << " " << generation[j][i][2] << endl;
+			}
+		}
+		gen_out << endl;
+
 
 	}
 	catch (exception& e) {
@@ -119,3 +133,4 @@ int main (int argc, char* argv[]) {
 
 // EOF
 
+ 
