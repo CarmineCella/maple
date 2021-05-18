@@ -3,7 +3,7 @@
 
 
 #ifndef UTILS_H
-#define UTILS_H 
+#define UTILS_H
 
 #include <string>
 #include <fstream>
@@ -12,7 +12,6 @@
 #include <stdexcept>
 #include <cmath>
 #include <cstring>
-
 
 #include <sys/types.h>
 #include <dirent.h>
@@ -42,6 +41,7 @@ struct Parameters {
 		read (config_file);
 	}
 	void setup () {
+		npref = 0;
 		dictionary_type = "gabor"; SR = 44100;  J = 12; minj = 8; comp = 100; oct_div = 12;
 		phi_slices = 4;	
 		overlap = 4; freq_limit = 17000;
@@ -111,7 +111,10 @@ struct Parameters {
 	    }
 	}
 	void set_parameter (std::deque<std::string>& tokens) {
-   		if (tokens[0] == "SR") {
+   		if (tokens[0] == "npref") {
+        	npref = atol (tokens[1].c_str ());
+			if (SR < 8000) throw std::runtime_error ("invaild SR");
+        }else if (tokens[0] == "SR") {
         	SR = atof (tokens[1].c_str ());
 			if (SR < 8000) throw std::runtime_error ("invaild SR");
         } else if (tokens[0] == "J") {
@@ -170,6 +173,8 @@ struct Parameters {
 
 	std::string dictionary_type;
 	std::string dictionary_path;
+
+	int npref;
 
 	T SR;
 	int J;

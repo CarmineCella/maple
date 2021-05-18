@@ -593,7 +593,7 @@ int generate_channel (const Parameters<T>& p,  StateTab& tab, const Dictionary<T
 	assert (suf.size () > 0);
 	int rp = rand() % suf.size();
 	int w = suf[rp]; 
-	int len = dict.parameters.at (w).at (1);
+	int len = dict.parameters.at (w).at (1); // 1st is length
 	T max_prod = 1;
 	frame.push_back (std::vector<T> {(T) w, max_prod, (T) time_pos});
 	current.pop_front();
@@ -606,12 +606,13 @@ int generate_channel (const Parameters<T>& p,  StateTab& tab, const Dictionary<T
 }
 template <typename T>
 void probabilistic_generation (const Parameters<T>& p, std::vector<StateTab>& tabs, 
-	const Dictionary<T>& dict, int nwords,
+	const Dictionary<T>& dict, int target_len,
 	Decomposition<T>& generation) {
+	generation.clear ();
 	std::vector<Prefix> currents (p.comp);
 	int time_pos = 0;
 	
-	for (unsigned j = 0; j < nwords; ++j) {
+	while (time_pos < target_len) {
 		DynamicMatrix<T> frame; // FIXME
 		int max_len = 0;
 		for (unsigned i = 0; i < p.comp; ++i) {	
@@ -621,6 +622,37 @@ void probabilistic_generation (const Parameters<T>& p, std::vector<StateTab>& ta
 		time_pos += max_len;
 		if (frame.size () == p.comp) generation.push_back (frame);	
 	}
+}
+
+// ----------------------------------------------------------------------------------
+void export_transitions (std::ostream& out, std::vector<StateTab>& tabs) {
+	for (unsigned h = 0; h < tabs.size (); ++h) {
+		out << "CHANNEL " << h << std::endl;
+		StateTab& tab = tabs.at (h);
+		for (std::map<Prefix, std::vector<int> >::iterator i = tab.begin (); i != tab.end (); ++i) {
+			out << "[";
+			for (unsigned l = 0; l < i->first.size (); ++l) {
+				out << i->first.at (l) << " ";
+			}
+			out << "] ";
+			for (unsigned j = 0; j < i->second.size (); ++j) {
+				out << i->second.at (j) << " ";
+			}
+			out << std::endl;
+		}
+		out << std::endl;
+	}	
+}
+
+template <typename T>
+void save_decomposition (const Parameters<T>& p, std::ostream& out, Decomposition<T>& decomposition) {
+	for (unsigned j = 0; j < decomposition.size (); ++j) {
+		for (unsigned i = 0; i < p.comp; ++i) {
+			out << decomposition[j][i][0] << " " << decomposition[j][i][1] << " " << decomposition[j][i][2] << " ";
+		}
+		out << std::endl;
+	}
+	out << std::endl;
 }
 
 #endif	// ALGORITHMS_H 

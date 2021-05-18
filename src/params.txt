@@ -2,6 +2,9 @@
 ; maple config
 ; ------------
 
+; action to perform 0 = reconstruction, 1-n probabilistic generation at the specified level
+npref             2
+
 ; set dictionary type [gabor, gammatone, frames, onsets]
 ; for onsets and frames you need to specify the folder containing the samples (only mono files 16 bit)
 ; for onsets you need to specify also the threshold (0-1) and the timegate (sec.) for the segmentation
@@ -12,10 +15,11 @@
 ;dictionary 			frames ../../dict/orchestra
 ;dictionary 			onsets ../../dict/People .1 .1
 ;dictionary 			onsets ../../dict/Animals .4 .01
-dictionary          frames /Users/Carmine/Projects/Media/Datasets/TinySOL/Winds/ClBb
-;dictionary          frames /Users/Carmine/Projects/Media/Datasets/TinySOL/Brass/Hn
+;dictionary          frames /Users/Carmine/Projects/Media/Datasets/TinySOL/Winds/ClBb
+dictionary          frames /Users/Carmine/Projects/Media/Datasets/TinySOL/Brass/Hn
 ;dictionary          onsets /Users/Carmine/Projects/Media/Sounds/Samples/instruments .2 .01
 ;dictionary          frames /Users/Carmine/Projects/Media/Sounds/Samples/instruments
+
 ;dictionary      gabor
 ;dictionary      gammatone
 
@@ -34,14 +38,14 @@ segmentation    .1 .1
 ; freq_limit is used to determine the highest frequency
 ; do not change phi_slices
 minj 			11
-oct_divisions 	60
+oct_divisions 	1
 phi_slices		1
 freq_limit 		17000
 
 ; use 40-120 components for dictionaries 'gabor' and 'gammatone'
 ; use 1-6 components for dictionaries 'frames' and 'onsets'
 ; use 4-8 overlap factor (not used for 'onsets')
-components 		6
+components 		8
 overlap 		4
 
 ; pitch shift and time stretch

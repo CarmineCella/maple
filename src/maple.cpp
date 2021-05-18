@@ -44,6 +44,7 @@ int main (int argc, char* argv[]) {
 			dict.write (&dictionary.atoms[i][0], dictionary.atoms[i].size ());
 		}
 		ofstream dict_params ("dictionary_params.txt");
+		if (!dict_params.good ()) throw runtime_error ("cannot create file for dictionary parameters");
 		for (unsigned i = 0; i < dictionary.parameters.size (); ++i) {
 			for (unsigned j = 0; j < dictionary.parameters[i].size (); ++j) {
 				dict_params << dictionary.parameters[i][j] << " ";
@@ -60,16 +61,27 @@ int main (int argc, char* argv[]) {
 		clock_t toc = clock ();
 		cout << "analysing........... done (" << 
 			(float) (toc - tic) / CLOCKS_PER_SEC << " sec.)" << endl; cout.flush ();
-		
+
+		if (p.npref != 0) {
+			vector<StateTab> tabs;
+			Prefix prefix; // current input prefix
+			cout << "building transitions"; cout.flush();
+			build_transitions (p, decomposition, p.npref, prefix, tabs);
+			cout << " done (order " << p.npref << ")"  << endl << endl;		
+			cout << "saving transitions.. "; cout.flush();
+			ofstream trans_out ("transitions.txt");
+			if (!trans_out.good ()) throw runtime_error ("cannot create file for transitions");		
+			export_transitions (trans_out, tabs);
+			cout << " done "<< endl;
+			cout << "generating.......... "; cout.flush();
+			probabilistic_generation (p, tabs, dictionary, in.getNumSamples (), decomposition);
+			cout << " done "<< endl;
+		}		
 		cout << "saving analysis..... "; cout.flush ();
 		ofstream decomp_out ("decomposition.txt");
-		for (unsigned i = 0; i < p.comp; ++i) {
-			for (unsigned j = 0; j < decomposition.size (); ++j) {
-				decomp_out << decomposition[j][i][0] << " " << decomposition[j][i][1] << " " << decomposition[j][i][2] << endl;
-			}
-			decomp_out << endl;
-		}
-		cout << "done" << endl;
+		if (!decomp_out.good ()) throw runtime_error ("cannot create file for decomposition");
+		save_decomposition (p, decomp_out, decomposition);
+		cout << " done" << endl;
 
 #ifdef DEBUG_DECOMPOSITION
 		for (int i = 0; i < p.comp; ++i) {
@@ -90,36 +102,6 @@ int main (int argc, char* argv[]) {
 		WavOutFile reconstruction (argv[3], p.SR, 16, 1);
 		reconstruction.write (&rebuild[0], rebuild.size ());
 		cout << " done"<< endl << endl;
-
-		vector<StateTab> tabs;
-		Prefix prefix; // current input prefix
-		cout << "building transitions"; cout.flush();
-		int order = 10;
-		build_transitions (p, decomposition, order, prefix, tabs);
-		cout << " done"<< endl << endl;
-		
-		cout << "generating decomposition"; cout.flush();
-		int nwords = 200;
-		Decomposition<float> generation;
-		probabilistic_generation (p, tabs, dictionary, nwords, generation);
-		cout << " done"<< endl << endl;
-		
-		vector<float> regen;
-		pursuit_reconstruction (p, dictionary, generation, regen);
-
-		cout << "gen size " << generation.size () << endl;
-		WavOutFile regeneratio ("gen.wav", p.SR, 16, 1);
-		regeneratio.write (&regen[0], regen.size ());
-
-
-		ofstream gen_out ("generation.txt");
-		for (unsigned j = 0; j < generation.size (); ++j) {
-			for (unsigned i = 0; i < p.comp; ++i) { // FIXME
-				gen_out << generation[j][i][0] << " " << generation[j][i][1] << " " << generation[j][i][2] << endl;
-			}
-		}
-		gen_out << endl;
-
 
 	}
 	catch (exception& e) {
