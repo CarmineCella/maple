@@ -25,7 +25,7 @@
 // - improve segmentation 
 
 //#define DEBUG_DECOMPOSITION
-#define USE_FAST_DOTPROD
+//#define USE_FAST_DOTPROD
 
 #define ONSET_FADE_MS 10
 
