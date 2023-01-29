@@ -323,6 +323,20 @@ void make_dictionary (const Parameters<T>& p, Dictionary<T>& dict) {
 				store_vector(o, std::vector<T> {0., (T) len, 0.}, dict);
 			}
 		}
+	}  else if (p.dictionary_type == "files") {
+		std::vector<std::string> files;
+		list_files (p.dictionary_path.c_str (), files);
+
+		for (unsigned i = 0; i < files.size (); ++i) {
+			if (files.at (i).find (".wav") != files.at (i).size () - 4) continue; // check WAV extension
+			std::string name = p.dictionary_path + "/" + files.at (i);
+			WavInFile in (name.c_str ());
+			if (!check_file (name, in, p)) continue;
+			long nsamp = in.getNumSamples ();
+			std::vector<T> data (nsamp);
+			in.read (&data[0], nsamp);
+			store_vector(data, std::vector<T> {0., (T) nsamp, 0.}, dict);
+		}
 	} else if (p.dictionary_type == "gabor" || p.dictionary_type == "gammatone") {
 		T comma = pow (2., 1. / p.oct_div);
 
@@ -420,7 +434,7 @@ void pursuit_decomposition (const Parameters<T>& p, const Dictionary<T>& diction
 	std::vector<T> buffer (N);
 	int r = target.size ();
 	std::vector<T> onsets;	
-	if (p.dictionary_type == "onsets") {
+	if (p.dictionary_type == "onsets" || p.dictionary_type == "files") {
 		get_onsets (&target[0], r, N, N / p.overlap, p.SR, p.target_onset_threshold, p.target_onset_timegate, onsets);
 		if (onsets.size () == 0) {
 			throw std::runtime_error ("no onsets found in target sound");
@@ -433,11 +447,11 @@ void pursuit_decomposition (const Parameters<T>& p, const Dictionary<T>& diction
 		if (perc % 10 == 0) {
 			out << "analysing........... " << perc << "%\r"; out.flush ();
 		}		
-		if (p.dictionary_type == "onsets") {
+		if (p.dictionary_type == "onsets" || p.dictionary_type == "files") {
 			int start =  (int) (onsets[ocntr] * p.SR);
 			int len = (int) (ocntr == onsets.size () - 1 ? r - start
 				: (int) ((onsets[ocntr + 1] - onsets[ocntr]) * p.SR));
-					
+
 			buffer.resize (len, 0);
 			for (unsigned i = 0; i < len; ++i) {
 				if (i + len >= r) buffer[i] = 0;

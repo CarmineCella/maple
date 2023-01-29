@@ -8,8 +8,7 @@ npref             0
 ; set dictionary type [gabor, gammatone, frames, onsets]
 ; for onsets and frames you need to specify the folder containing the samples (only mono files 16 bit)
 ; for onsets you need to specify also the threshold (0-1) and the timegate (sec.) for the segmentation
-;dictionary 		onsets ../../dict .1 .1
-;dictionary 		frames ../../dict
+dictionary          files ../../dict/SOL_flat
 ;dictionary          onsets ../../dict/Kitchen .2 .1
 ;dictionary 		onsets ../../dict/orchestra .2 .1
 ;dictionary 			frames ../../dict/orchestra
@@ -20,7 +19,7 @@ npref             0
 ;dictionary          onsets /Users/Carmine/Projects/Media/Sounds/Samples/instruments .2 .01
 ;dictionary          frames /Users/Carmine/Projects/Media/Sounds/Samples/instruments
 
-dictionary      gabor
+;dictionary      gabor
 ;dictionary      gammatone
 
 ; these parameters are used by all the dictionary types
@@ -29,7 +28,7 @@ SR 				44100
 J 				12
 
 ; these are the threshold (0-1) and timegate (sec.) parameters for the the segmetnation of the target
-; (used only if dictionary is 'onsets')
+; (used only if dictionary is 'onsets' or 'files')
 segmentation    .1 .1
 
 ; these parameters are used only for gabor and gammatone dictionaries
@@ -43,9 +42,9 @@ phi_slices		1
 freq_limit 		17000
 
 ; use 40-120 components for dictionaries 'gabor' and 'gammatone'
-; use 1-6 components for dictionaries 'frames' and 'onsets'
-; use 4-8 overlap factor (not used for 'onsets')
-components 		80
+; use 1-6 components for other dictionaries
+; use 4-8 overlap factor (only used for 'gabor' and 'gammatone')
+components 		8
 overlap 		4
 
 ; pitch shift and time stretch

@@ -51,7 +51,7 @@ struct Parameters {
 	}
 	void print (std::ostream& out) {
 		out << "dictionary type..... " << dictionary_type;
-		if (dictionary_type == "frames" || dictionary_type == "onsets") {
+		if (dictionary_type == "frames" || dictionary_type == "onsets" || dictionary_type == "files") {
 			out << " (" << dictionary_path << ") ";
 			if (dictionary_type == "onsets") out << db_onset_threshold << " " << db_onset_timegate; 
 		}
@@ -152,7 +152,10 @@ struct Parameters {
 				db_onset_threshold = atof (tokens[3].c_str ());
 				db_onset_timegate = atof (tokens[4].c_str ());
 				if (db_onset_threshold < 0 || db_onset_timegate < 0) throw std::runtime_error ("invaild db onset parameters");
-			}			
+			}	
+			if (dictionary_type == "files") {
+				dictionary_path = tokens[2];
+			}		
         } else if (tokens[0] == "segmentation") {
 			if (tokens.size () < 3) std::runtime_error ("invalid number of parameters in config file (segmentation)");		
         	target_onset_threshold = atof (tokens[1].c_str ());

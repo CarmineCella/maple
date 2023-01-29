@@ -10,13 +10,17 @@
 
 using namespace std;
 
-#define VERSION 0.2
+#define VERSION 0.3
+
+// TODO:
+// - file-based decomposition
+// - filters for file-based dictionary
 
 int main (int argc, char* argv[]) {
 	srand (time (NULL));
 	cout << "[ma.p.l.e, ver. " << VERSION << "]" << endl << endl;
 	cout << "matching pursuit linear expansion" << endl;
-	cout << "(C) 2021 www.carminecella.com" << endl << endl;
+	cout << "(C) 2021-2023 www.carminecella.com" << endl << endl;
 	try {
 		if (argc != 4) {
 			throw runtime_error ("syntax is 'maple params.txt input.wav output.wav");
@@ -38,6 +42,8 @@ int main (int argc, char* argv[]) {
 		cout << "making dictionary..."; cout.flush();
 		make_dictionary<float>(p, dictionary);
 		std::cout << " done (" << dictionary.atoms.size () << " atoms)" << std::endl;
+
+#ifdef DEBUG_DICTIONARY				
 		cout << "saving dictionary..."; cout.flush();
 		WavOutFile dict ("dictionary_atoms.wav", p.SR, 16, 1);
 		for (unsigned i = 0; i < dictionary.atoms.size (); ++i) {
@@ -53,6 +59,7 @@ int main (int argc, char* argv[]) {
 		}
 		dict_params.close ();
 		cout << " done" << endl;
+#endif
 
 		// analysis
 		Decomposition<float> decomposition;
@@ -72,16 +79,16 @@ int main (int argc, char* argv[]) {
 			ofstream trans_out ("transitions.txt");
 			if (!trans_out.good ()) throw runtime_error ("cannot create file for transitions");		
 			export_transitions (trans_out, tabs);
-			cout << " done "<< endl;
+			cout << " done"<< endl;
 			cout << "generating.......... "; cout.flush();
 			probabilistic_generation (p, tabs, dictionary, in.getNumSamples (), decomposition);
-			cout << " done "<< endl;
+			cout << " done"<< endl;
 		}		
 		cout << "saving analysis..... "; cout.flush ();
 		ofstream decomp_out ("decomposition.txt");
 		if (!decomp_out.good ()) throw runtime_error ("cannot create file for decomposition");
 		save_decomposition (p, decomp_out, decomposition);
-		cout << " done" << endl;
+		cout << "done" << endl;
 
 #ifdef DEBUG_DECOMPOSITION
 		for (int i = 0; i < p.comp; ++i) {
